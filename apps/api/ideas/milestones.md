@@ -1,95 +1,98 @@
-# OpenBayan Classical Arabic IR & Synthesis: MVP Milestones Roadmap
+# OpenBayan Classical Arabic Search & Reading Engine: Minimalist MVP Milestones
 
-Using **`AuthenticIlm/Shamela4_Full_DB`** for pre-built Table of Contents (TOC) trees, **`Maktabati/shamela-vectors`** for pre-computed 768-dim dense embeddings (`intfloat/multilingual-e5-base`), and **`ohsn/shamela_Qgen`** for evaluation removes the need for regex-based structural parsing and GPU embedding generation.
-
-The MVP focuses on a controlled 5,000–10,000 passage vertical slice across canonical reference works (*Al-Majmūʿ Sharḥ al-Muhadhdhab*, *Bidāyat al-Mujtahid*, *Iḥyāʾ ʿUlūm al-Dīn*, *Tafsīr Ibn Kathīr*, and *Ṣaḥīḥ al-Bukhārī*).
+A focused, high-performance content search and reading platform for classical Islamic texts. Built with zero GPU embedding overhead, zero Java/JVM bloat, zero complex graph databases, and zero LLM hallucination risk.
 
 ---
 
-## 🏗️ Architectural Shifts Post-Sample Inspection
+## 🧭 MVP Milestone Overview
 
-| Pipeline Stage | Previous Spec Assumption | Revised Best Practice (Post-Inspection) | Impact |
+| Milestone | Core Deliverable | Primary Tech & Data Assets | Validation Gate |
 | :--- | :--- | :--- | :--- |
-| **Ingestion Hierarchy** | Regex `HeadingStackTracker` parsing text | Parse `toc.jsonl` with explicit `parent_id` and `page_id` | **Zero structural guesswork.** Clean *Kitāb $\to$ Bāb $\to$ Faṣl* hierarchy. |
-| **Dense Embeddings** | Generate embeddings locally on GPU | Direct Parquet join with `Maktabati/shamela-vectors` (768-dim E5) | **Bypasses GPU compute entirely.** Ingestion finishes in minutes. |
-| **Query Embedding** | Mandatory client-side WebGPU (220MB) | Server-side `fastembed` / ONNX on FastAPI with `"query: "` prefix | **Avoids 220MB client download** on mobile; optional client WebGPU later. |
-| **Search Engine** | Experimental "Tantivy DDL" in SQLite | Native **SQLite / libSQL FTS5** (`unicode61 remove_diacritics 2`) | **Sub-2ms BM25 ranking** natively in single-file DB without external daemons. |
-| **Tokenization Format** | Bare trilateral roots only (`س-ل-م`) | Composite Lemma + Root tokens (`سلم سليم تسليم اسلم`) | **Prevents over-stemming** and legal term confusion in BM25 ranking. |
-| **Clustering Engine** | MinHash Jaccard ($J \ge 0.40$) on roots | TOC Hierarchical Grouping + Vector Cosine Clustering | **Semantically coherent groups**; MinHash reserved for quote deduplication. |
-| **Quality Gate** | Manual qualitative spot-checking | Automated benchmark harness against `ohsn/shamela_Qgen` | **Objective quantitative metrics** (Recall@K & MRR) before frontend release. |
+| **M1: Lean Ingestion & Indexing** | Ingest `pages.jsonl` + `toc.jsonl`, join pre-computed vectors, generate `Tashaphyne` stems, build single-file DB. | `AuthenticIlm`, `Maktabati/vectors`, `PyArabic`, `Tashaphyne`, SQLite/libSQL | 10k passages indexed with FTS5 BM25 + 768-dim Vectors in $< 90\text{s}$ (Zero JVM). |
+| **M2: Hybrid Retrieval & Context Engine** | Hybrid search (FTS5 BM25 + Vector Cosine), contiguous sibling merger, 3-tier context resolution. | FastAPI, `fastembed` (CPU E5), SQLite FTS5 | Combined hybrid search + sibling merge latency $< 8\text{ ms}$. |
+| **M3: Astro SSR & DaisyUI Reader Islands** | 0-JS permalinks (`/p/:id`), responsive search workspace, slide-out full chapter reading drawer. | Astro SSR, React, DaisyUI, Nanostores, Tailwind CSS | 0 KB client JS on `/p/:id`, smooth 60 FPS drawer opening. |
+| **M4: Container Gateway & Crawler Verification** | Single-domain Docker Compose stack behind Zoraxy with read-only NVMe mounts. | Zoraxy, Docker Compose, Linux NVMe | 100% first-byte text delivery for crawlers; single-domain zero-CORS. |
 
 ---
 
-## 🗺️ Revised 5-Stage MVP Roadmap
+## 🏗️ Architecture Flow
 
 ```
- ┌────────────────────────────────────────────────────────────────────────┐
- │                    REVISED MVP IMPLEMENTATION STACK                    │
- ├───────────────────────────────────┬────────────────────────────────────┤
- │ M1: Ingestion & Artifact Join     │ M2: Hybrid Engine & Evaluation     │
- │ • Stream AuthenticIlm (TOC+Pages) │ • FastEmbed Server-side Vectorizer │
- │ • Join Maktabati Vectors (768-dim)│ • SQLite FTS5 (Lemma + Roots)      │
- │ • Extract Composite Lemmas+Roots  │ • Automated Qgen Eval (MRR/Recall) │
- ├───────────────────────────────────┼────────────────────────────────────┤
- │ M3: Grounded Synthesis & MCP      │ M4: Astro SSR & DaisyUI Islands    │
- │ • Strict LLM Grounding Contract   │ • Zero-JS Permalinks (`/p/:id`)    │
- │ • Footnote Anchors (`[^ref1]`)    │ • 3-Tier Depth Toggles             │
- │ • Autonomous Agent Tool Spec (MCP)│ • Nanostores Citation Drawer       │
- ├───────────────────────────────────┴────────────────────────────────────┤
- │ M5: Reverse Proxy (Zoraxy) & Production Gateway                        │
- └────────────────────────────────────────────────────────────────────────┘
+                      LEAN CONTENT SEARCH ARCHITECTURE
+                      
+      User Search Query: "شروط بيع السلم في المذهب الشافعي"
+                    │
+                    ▼
+    ┌──────────────────────────────────────────────┐
+    │ FASTAPI QUERY HANDLER                        │
+    │ • Normalize text (PyArabic)                  │
+    │ • Generate search stems (Tashaphyne)         │
+    │ • Encode vector query (fastembed on CPU)     │
+    └──────────────────────┬───────────────────────┘
+                           │
+                           ▼
+    ┌──────────────────────────────────────────────┐
+    │ SQLite / libSQL EMBEDDED DATABASE            │
+    │ • FTS5 BM25 on text stems (`unicode61`)      │
+    │ • Vector Cosine distance (768-dim E5)        │
+    │ • Join contiguous sibling pages (N-1, N, N+1)│
+    └──────────────────────┬───────────────────────┘
+                           │
+                           ▼
+    ┌──────────────────────────────────────────────┐
+    │ ASTRO SSR FRONTEND                           │
+    │ • Render instant HTML search result cards    │
+    │ • Slide open chapter reading drawer          │
+    │ • 0-JS static permalinks (/p/:id)            │
+    └──────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📋 Detailed Milestone Deliverables
+## 📋 Milestone Breakdown
 
-### Milestone 1: Streamed Ingestion & Artifact Join (Backend / Pipeline)
+### Milestone 1: Lean Ingestion & Indexing Pipeline
 
-* **Target Canonical Slice:** Ingest canonical works from `AuthenticIlm/Shamela4_Full_DB` in `data/samples/` (*Al-Majmūʿ*, *Bidāyat al-Mujtahid*, *Iḥyāʾ*, *Tafsīr Ibn Kathīr*, *Ṣaḥīḥ al-Bukhārī*).
-* **Page-to-TOC Forward Fill:** Map `toc.jsonl` onto `pages.jsonl` via `page_id` to assign explicit `section_id`, `section_level`, `section_title`, and breadcrumbs to each physical page.
-* **Footnote Isolation:** Store body text in `raw_text` and keep original footnotes in a dedicated `footnotes` column to prevent BM25 score corruption.
-* **Vector Join:** Join `(book_id, page_id)` directly against `Maktabati/shamela-vectors` Parquet partitions to populate the 768-dimensional `embedding` column without local GPU calculation.
-* **Linguistic Tagging:** Generate composite `salient_roots_text` (normalized lemmas + trilateral roots) via PyArabic / fast stemmer, calculate 512-byte MinHash signatures via `datasketch`, and commit into `shamela_corpus.db` with SQLite FTS5 index enabled.
+* **Source Extraction:** Stream canonical books from `AuthenticIlm/Shamela4_Full_DB` in `data/samples/` (`pages.jsonl` and `toc.jsonl`).
+* **Hierarchy Forward-Fill:** Map parent-child headings from `toc.jsonl` directly to each page's `page_id` to establish `section_title`, `section_level` (*Kitāb $\to$ Bāb $\to$ Faṣl*), and breadcrumbs.
+* **Footnote Isolation:** Store body text in `raw_text` and route editorial commentary to a separated `footnotes` column to prevent BM25 score corruption.
+* **Vector Alignment:** Join `(book_id, page_id)` directly against `Maktabati/shamela-vectors` Parquet files to populate the 768-dim `embedding` column without local GPU compute.
+* **Java-Free Stemming:** Use `PyArabic` and `Tashaphyne` to generate normalized composite stems (`salient_roots_text`) for SQLite FTS5 indexing.
+* **Database Target:** Write records into a local single-file `shamela_corpus.db` with SQLite FTS5 full-text search and vector BLOB storage enabled.
 
-### Milestone 2: Hybrid Retrieval & Automated Evaluation Core
+### Milestone 2: FastAPI Hybrid Retrieval & Context Resolution
 
-* **Server-Side Query Vectorizer:** Embed incoming search queries via `fastembed` (`intfloat/multilingual-e5-base` quantized ONNX) on FastAPI CPU ($< 6\text{ ms}$), enforcing the mandatory `"query: "` prefix.
-* **Hybrid Scoring Engine:** Implement Reciprocal Rank Fusion (RRF) combining SQLite FTS5 BM25 (lemmas + roots) and vector cosine similarity.
-* **Contiguous Sibling Merger:** Automatically merge adjacent pages from the same book and section before clustering.
-* **Boundary-Aware Expansion:** Implement `/api/v1/chunks/{id}/surrounding` utilizing `active_section_id` to resolve Level-2 context ($N-1 \leftrightarrow N+1$) without spilling across unrelated chapters.
-* **SIMD Clustering & Thematic Grouping:** Partition candidate results by hierarchical TOC sections and cosine similarity.
-* **Automated Evaluation Harness:** Run `scripts/benchmark_retrieval.py` over 500 samples from `ohsn/shamela_Qgen_2000samples` to verify **Recall@5 $\ge 85\%$** and **MRR $\ge 0.70$**.
+* **CPU Query Vectorizer:** Embed runtime queries via `fastembed` (`intfloat/multilingual-e5-base`) in $< 5\text{ ms}$ on CPU with the mandatory `"query: "` prefix.
+* **Hybrid Scoring Router:** Implement `/api/v1/search` combining FTS5 BM25 stem scores and vector cosine similarities using Reciprocal Rank Fusion (RRF).
+* **Contiguous Sibling Merger:** Detect when search results return adjacent pages from the same book ($N, N+1$) and merge them into unified, readable passage blocks.
+* **3-Tier Context Resolvers:**
+  * *Level 1 (Atomic):* Single-page hit snippet.
+  * *Level 2 (Discourse):* Surrounding sibling context ($N-1 \leftrightarrow N+1$) respecting section boundaries via `/api/v1/chunks/{id}/surrounding`.
+  * *Level 3 (Chapter):* Stream consecutive chunks for full-chapter reading via `/api/v1/books/{id}/sections/{section_id}/chunks`.
 
-### Milestone 3: Grounded Synthesis & AI Agent Protocols
+### Milestone 3: Astro SSR Frontend & DaisyUI Reader Islands
 
-* **SSE Stream Router:** Build `GET /api/v1/synthesis/stream` emitting `meta`, `token`, and `citations` frames via LiteLLM / local model.
-* **Strict Footnote Grounding:** Formulate the LLM prompt contract to enforce exact citation anchors (`[^ref1]`, `[^ref2]`) tied 1:1 to database `chunk_id` and volume/page coordinates.
-* **Agent Protocol (MCP):** Build `POST /api/v1/agent/tools/search_corpus` conforming to Model Context Protocol (MCP) standards, returning structured text, bookend context, and canonical permalinks.
+* **0-JS SEO Permalinks:** Build `src/pages/p/[id].astro` delivering instant, pre-rendered semantic HTML with Schema.org `ScholarlyArticle` metadata and zero client JavaScript overhead.
+* **Search Workspace Island:** Create `src/pages/search.astro` featuring `<SearchBar client:load/>` and `<PassageCard/>` with an inline 3-tier depth switcher:
+  * `مقتطف` (Snippet view)
+  * `سياق` (Expanded adjacent context)
+  * `مطالعة ↗` (Full-chapter view)
+* **Slide-Out Reading Drawer:** Implement `<CitationDrawer client:idle/>` using controlled DaisyUI classes bound to Nanostores (`$isDrawerOpen`, `$activeCitation`) for reading entire chapters without page reloads.
+* **Typography & RTL:** Configure Tailwind with classical Arabic font stacks (`Amiri`, `Traditional Arabic`) and high-contrast paper tones.
 
-### Milestone 4: Astro SSR & Reactive Island Workspace
+### Milestone 4: Production Containerization & Crawler Verification
 
-* **Crawlable Permalinks:** Build `src/pages/p/[id].astro` rendering clean semantic HTML and Schema.org `ScholarlyArticle` JSON-LD with 0 KB client JavaScript for instant bot indexing.
-* **Workspace Islands:** Implement `<SearchBar client:load/>` and `<PassageCard/>` with 3-tier depth toggles:
-  * *Level 1 (مقتطف):* Compact snippet.
-  * *Level 2 (سياق):* Sibling page context with boundary highlights.
-  * *Level 3 (مطالعة):* Opens `<CitationDrawer client:idle/>` for full chapter reading.
-* **State Coordination:** Bind DaisyUI drawer toggles and footnote citations directly to Nanostores (`$isDrawerOpen`, `$activeCitation`).
-
-### Milestone 5: Gateway Routing, Deployment & Audit
-
-* **Reverse Proxy (Zoraxy):** Configure single-domain routing (`/` and `/search` to Astro port 4321; `/api/v1/*` to FastAPI port 8000).
-* **Production Container Stack:** Assemble `compose.yml` with read-only NVMe volume mounts for `shamela_corpus.db`.
-* **Crawl & Latency Audit:** Verify first-byte delivery for search crawlers (`GPTBot`, `ClaudeBot`) and confirm end-to-end search latency stays under $15\text{ ms}$.
+* **Gateway Configuration:** Route both services behind Zoraxy (`/` and `/search` to Astro on port 4321; `/api/v1/*` to FastAPI on port 8000).
+* **Production Containerization:** Assemble a lean `compose.yml` deploying Astro (Node SSR) and FastAPI with the database mounted as read-only (`:ro`).
+* **Latency & SEO Audit:** Validate that search API response times remain under $10\text{ ms}$ and verify that bots (`GPTBot`, `ClaudeBot`, `curl`) extract complete passage text from first-byte HTML responses.
 
 ---
 
-## 🎯 Verification & Quality Gates
+## 🎯 Verification Gates
 
 | Milestone | Gate Criteria | Target Metric |
 | :--- | :--- | :--- |
-| **M1 Gate** | 10k passages indexed with FTS5 + 768-dim vectors | Execution $< 60\text{s}$ |
-| **M2 Gate** | Automated retrieval benchmark over 500 QGen samples | **Recall@5 $\ge 85\%$**, **MRR $\ge 0.70$**, Latency $< 15\text{ms}$ |
-| **M3 Gate** | Synthesis stream emits 100% verifiable `[^refN]` anchors | 0 hallucinated citation tags |
-| **M4 Gate** | Astro SSR reader `/p/:id` rendered with 0 CLS | Raw HTML $< 2\text{ KB}$, 0 client JS |
-| **M5 Gate** | Production Docker stack with zero-CORS reverse proxy | All healthchecks pass |
+| **M1 Gate** | 10k passages indexed with FTS5 + 768-dim vectors | Execution $< 90\text{s}$, 0 Java dependencies |
+| **M2 Gate** | Combined hybrid search + sibling merge | Latency $< 8\text{ ms}$ |
+| **M3 Gate** | Astro SSR reader `/p/:id` rendered with 0 CLS | Raw HTML $< 2\text{ KB}$, 0 client JS |
+| **M4 Gate** | Production Docker stack with Zoraxy single-domain | 100% bot first-byte crawl pass, $< 10\text{ms}$ API SLA |
