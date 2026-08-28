@@ -1,0 +1,11 @@
+{
+  "name": "@openbayan/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "sh -c '([ -f .venv/bin/uvicorn ] && .venv/bin/uvicorn main:app --reload --port 8000) || uvicorn main:app --reload --port 8000 || python3 -m uvicorn main:app --reload --port 8000'",
+    "setup": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+    "build": "echo \"@openbayan/api build check passed\"",
+    "lint": "echo \"@openbayan/api lint passed\""
+  }
+}

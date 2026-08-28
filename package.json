@@ -1,0 +1,14 @@
+{
+  "name": "openbayannext",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "setup:api": "pnpm --filter @openbayan/api setup"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4"
+  },
+  "packageManager": "pnpm@11.3.0"
+}

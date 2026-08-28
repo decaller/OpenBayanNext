@@ -1,0 +1,60 @@
+services:
+  # 1. Astro Web Frontend
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: openbayan_web
+    ports:
+      - "4321:4321"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # 2. FastAPI Backend & Search Engine
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: openbayan_api
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_PATH=/data/shamela_corpus.db
+    restart: unless-stopped
+
+  # 3. Prefect Orchestration Server (Optional)
+  prefect-server:
+    image: prefecthq/prefect:2-python3.12
+    container_name: openbayan_prefect_server
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+    volumes:
+      - ./prefect_data:/root/.prefect
+    profiles: ["pipeline"]
+    restart: unless-stopped
+
+  # 4. Dedicated Ingestion Worker (Optional)
+  ingestion-worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: openbayan_ingestion_worker
+    command: python -m pipeline.ingest_flow
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - DB_PATH=/data/shamela_corpus.db
+    volumes:
+      - ./data:/data:rw
+      - ./raw_texts:/raw_texts:ro
+    depends_on:
+      - prefect-server
+    profiles: ["pipeline"]
+    restart: unless-stopped
