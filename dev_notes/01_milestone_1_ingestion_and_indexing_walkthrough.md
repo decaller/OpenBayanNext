@@ -1,6 +1,6 @@
 # Milestone 1: Lean Ingestion & Indexing Pipeline — Complete Walkthrough
 
-This document provides the complete architecture summary, schema specifications, benchmark metrics, and hands-on testing instructions for **Milestone 1**.
+This document provides the complete architecture summary, schema specifications, benchmark metrics, storage breakdown, and hands-on testing instructions for **Milestone 1**.
 
 ---
 
@@ -63,30 +63,53 @@ This document provides the complete architecture summary, schema specifications,
 
 ---
 
-## 📊 Ingestion Summary & Database Statistics
+## 📊 Ingestion Summary & Database Footprint Breakdown
 
 ```text
-========================================================
-🎉 Ingestion Summary (data/shamela_corpus.db)
-========================================================
-   • Total Canonical Books:  60
-   • Total Section Nodes:    97,533
-   • Total Chunks / Pages:   76,274
-   • Database File Size:     487.00 MB
-   • FTS5 Rebuild Time:      6.26 seconds
-   • Journal Mode:           DELETE (Read-Only Docker Safe)
-========================================================
+========================================================================
+🎉 Ingestion Summary (`data/shamela_corpus.db`)
+========================================================================
+   • Total Canonical Books:   60
+   • Total Section Nodes:     97,533
+   • Total Chunks / Pages:    76,274
+   • Total Database File Size: 487.00 MB
+   • FTS5 Rebuild Time:       6.26 seconds
+   • Journal Mode:            DELETE (Read-Only Docker Safe)
+========================================================================
 ```
+
+### 💾 Physical Storage Footprint Analysis
+
+The $487.00\text{ MB}$ single-file database footprint decomposes into two distinct storage layers:
+
+| Component | Storage Size | % of Database | Description |
+| :--- | :---: | :---: | :--- |
+| **Dense Vector Embeddings** | **$234.3\text{ MB}$** | **$48.1\%$** | $76,274\text{ rows} \times 768\text{ dims} \times 4\text{ bytes}$ IEEE 754 float32 (`<f4`) blobs stored in `prepared_chunks.embedding`. |
+| **Text, TOC & FTS5 Index** | **$252.7\text{ MB}$** | **$51.9\%$** | Full raw text, footnotes, bibliographic JSON, B-tree indexes, and SQLite FTS5 inverted posting lists (`prepared_chunks_fts`). |
+
+---
+
+## 🔍 Query Tokenization & Disjunctive Lemma Grouping
+
+When converting user queries into SQLite FTS5 match expressions, attached prepositions (e.g. `بـ`, `لـ`, `كـ`, `فـ`) and morphological variants can prevent strict `AND` intersections from matching. 
+
+> [!TIP]
+> **Runtime Query Protocol (Milestone 2):**
+> Runtime query generators must construct **disjunctive lemma groupings with mandatory root intersections**:
+> ```text
+> salient_roots_text: (عمل OR اعمال) AND (نوي OR نيه OR نيات OR بالنيات)
+> ```
+> This ensures queries like `إنما الأعمال بالنيات` match passages regardless of whether the word appears as `نية`, `نوى`, `النيات`, or `بالنيات`.
 
 ---
 
 ## 🧪 How to Test & Verify the Ingestion Results
 
-We provide two dedicated testing tools located in [`dev_notes/01_milestone_1_ingestion_and_indexing/`](file:///home/abuhafi/Project/OpenBayanNext/dev_notes/01_milestone_1_ingestion_and_indexing/) to verify the corpus, query speeds, and surrounding context.
+We provide two dedicated testing tools located in [`dev_notes/01_milestone_1_ingestion_and_indexing/`](file:///home/abuhafi/Project/OpenBayanNext/dev_notes/01_milestone_1_ingestion_and_indexing/) to verify the corpus, query speeds, vector deserialization, and surrounding context.
 
 ### Method 1: Automated Verification Test Suite
 
-Run the automated test script to verify SQLite journal mode, table counts, FTS5 BM25 queries, and async `libsql_client` access:
+Run the automated test script to verify SQLite journal mode, table counts, FTS5 BM25 queries, async `libsql_client` access, and vector deserialization latency:
 
 ```bash
 apps/api/.venv/bin/python dev_notes/01_milestone_1_ingestion_and_indexing/verify_milestone1.py
@@ -105,38 +128,39 @@ apps/api/.venv/bin/python dev_notes/01_milestone_1_ingestion_and_indexing/verify
 ⚡ Benchmarking FTS5 BM25 Search Queries (JOIN Content Table):
 
   Query: 'سلم بيع' -> FTS Expr: 'salient_roots_text: (سلم AND بيع)'
-  • Latency: 4.616 ms | Found Hits: 5
+  • Latency: 4.997 ms | Found Hits: 5
   • Top Hit: [صحيح البخاري - ن عطاءات العلم] | حديث: أن رسول الله أرخص لصاحب العرية (ج 2 ص 317) | BM25 Rank: -4.38
     Snippet: "٢١٨٨ - حدَّثنا عَبْدُ اللَّهِ بْنُ مَسْلَمَةَ: حدَّثنا مالِكٌ، عن نافِعٍ، عن ابْنِ عُمَرَ: عَنْ زَيْدِ بْنِ ثابِتٍ ﵃: أَ..."
 
   Query: 'صلاة وتر' -> FTS Expr: 'salient_roots_text: (صلاه AND وتر)'
-  • Latency: 2.337 ms | Found Hits: 5
+  • Latency: 2.230 ms | Found Hits: 5
   • Top Hit: [رياض الصالحين - ت الفحل] | ٢١٢ - باب فضل قيام الليل (ص 332) | BM25 Rank: -8.23
     Snippet: "١١٦٨ - وعن ابن عمر ﵄: أنَّ النبيَّ ﷺ قَالَ: «صَلاةُ اللَّيْلِ مَثْنَى مَثْنَى، فَإذَا خِفْتَ الصُّبْحَ فَأوْتِرْ بِوَاحِ..."
 
   Query: 'طهارة ماء' -> FTS Expr: 'salient_roots_text: (طهاره AND ماء)'
-  • Latency: 1.991 ms | Found Hits: 5
+  • Latency: 1.905 ms | Found Hits: 5
   • Top Hit: [عشرون حديثا من صحيح البخاري دراسة أسانيدها وشرح متونها] | المبحث الرابع: شرح الحديث (ص 71) | BM25 Rank: -7.99
     Snippet: "١٤- وجوب الإيمان بالمغيبات التي أخبر بها النبي ﷺ ماضيها كعدم حل الغنائم للماضين ومستقبلها كإعطائها ﷺ الشفاعة. ١٥- أنه لا..."
 
   Query: 'عقل قلب' -> FTS Expr: 'salient_roots_text: (عقل AND قلب)'
-  • Latency: 1.776 ms | Found Hits: 5
+  • Latency: 1.764 ms | Found Hits: 5
   • Top Hit: [صحيح البخاري - ن عطاءات العلم] | حديث: أن رسول الله نهى عن المنابذة (ج 2 ص 304) | BM25 Rank: -7.44
     Snippet: "٢١٤٤ - حدَّثنا سَعِيدُ بْنُ عُفَيْرٍ، قالَ: حدَّثني اللَّيْثُ، قالَ: حدَّثني عُقَيْلٌ، عن ابْنِ شِهابٍ، قالَ: أخبَرَني ع..."
 
   Query: 'شفعة شريك' -> FTS Expr: 'salient_roots_text: (شفعه AND شريك)'
-  • Latency: 0.488 ms | Found Hits: 5
+  • Latency: 0.506 ms | Found Hits: 5
   • Top Hit: [الحلل الإبريزية من التعليقات البازية على صحيح البخاري] | ٩٦ - باب بيع الشريك من شريكه (ج 2 ص 232) | BM25 Rank: -13.35
     Snippet: "قال الحافظ: ... قوله: (لا بأس العشرة بأحد عشرة) (١).  <span data-type="title" id=toc-978>٩٦ - باب بيع الشَّريك من شريكه<..."
 
 ================================================================================
 🧪 2. Read-Only Immutable Access via libsql_client (FastAPI Driver)
 ================================================================================
-✓ Async Count Query via libsql_client: 76274 rows (in 0.295 ms)
-✓ Async FTS5 Search via libsql_client (in 0.501 ms) returned 3 rows:
+✓ Async Count Query via libsql_client: 76274 rows (in 0.291 ms)
+✓ Async FTS5 Search via libsql_client (in 0.521 ms) returned 3 rows:
   - [Chunk #161] [شرح العقيدة الطحاوية - عبد العزيز الراجحي] -> قوله: والشفاعة التي ادخرها لهم حق كما روي في الأخبار
   - [Chunk #362] [شرح العقيدة الطحاوية - عبد العزيز الراجحي] -> قوله: ونثبت الخلافة بعد رسول الله -صلى الله عليه وعلى آله وسلم- أولا لأبي بكر الصديق ﵁ تفضيلا له وتقديما على جميع الأمة ثم لعمر بن الخطاب ﵁ ثم لعثمان ﵁ ثم لعلي بن أبي طالب ﵁ وهم الخلفاء الرا
   - [Chunk #446] [مسائل العقيدة في كتاب التوحيد من صحيح البخاري] -> المطلب الخامس: شمائله
+✓ Vector Blob Deserialization (50 candidate rows): 0.029 ms (NumPy frombuffer <f4)
 
 🎉 ALL MILESTONE 1 VERIFICATIONS PASSED SUCCESSFULLY!
 ```

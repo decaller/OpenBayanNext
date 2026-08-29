@@ -3,6 +3,7 @@ import sys
 import time
 import asyncio
 import sqlite3
+import numpy as np
 
 # Add apps/api to python path (2 levels up from dev_notes/01_milestone_1_ingestion_and_indexing/)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "apps", "api")))
@@ -41,7 +42,6 @@ def test_sqlite_direct(db_path: str):
 
     print("\n⚡ Benchmarking FTS5 BM25 Search Queries (JOIN Content Table):")
     for query in test_queries:
-        # Extract stems for query
         terms = [w for w in normalize_arabic(query).split() if len(w) >= 2]
         fts_match_expr = f"salient_roots_text: ({' AND '.join(terms)})"
 
@@ -96,6 +96,13 @@ async def test_libsql_client(db_path: str):
     print(f"✓ Async FTS5 Search via libsql_client (in {(t1-t0)*1000:.3f} ms) returned {len(res_fts.rows)} rows:")
     for r in res_fts.rows:
         print(f"  - [Chunk #{r[0]}] [{r[1]}] -> {r[2]}")
+
+    # Benchmark 50-row vector blob deserialization
+    synthetic_blobs = [np.random.randn(768).astype("<f4").tobytes() for _ in range(50)]
+    t0 = time.perf_counter()
+    _ = [np.frombuffer(b, dtype="<f4") for b in synthetic_blobs]
+    t1 = time.perf_counter()
+    print(f"✓ Vector Blob Deserialization (50 candidate rows): {(t1-t0)*1000:.3f} ms (NumPy frombuffer <f4)")
 
     await db.close()
     print("\n🎉 ALL MILESTONE 1 VERIFICATIONS PASSED SUCCESSFULLY!")
