@@ -6,6 +6,7 @@ import {
   $isCompact,
   $contextDepth,
   $currentLang,
+  setLanguage,
   toggleHighlights, 
   setChunkFontSize, 
   toggleCompactView,
@@ -19,6 +20,23 @@ interface SearchControlsProps {
   lang?: SupportedLanguage;
 }
 
+const THEMES = [
+  { id: 'emerald', name: 'Emerald', labelAr: 'زمردي', icon: '🌿' },
+  { id: 'retro', name: 'Retro', labelAr: 'مخطوطة', icon: '📜' },
+  { id: 'light', name: 'Light', labelAr: 'فاتح', icon: '☀️' },
+  { id: 'dark', name: 'Dark', labelAr: 'داكن', icon: '🌙' },
+  { id: 'night', name: 'Night', labelAr: 'ليلي', icon: '🌌' },
+  { id: 'corporate', name: 'Corporate', labelAr: 'أكاديمي', icon: '🏛️' },
+  { id: 'winter', name: 'Winter', labelAr: 'شتوي', icon: '❄️' },
+  { id: 'coffee', name: 'Coffee', labelAr: 'قهوة', icon: '☕' },
+];
+
+const LANGUAGES: { code: SupportedLanguage; label: string; flag: string }[] = [
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'id', label: 'Indonesia', flag: '🇮🇩' },
+];
+
 export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLang }) => {
   const showHighlights = useStore($showHighlights);
   const fontSize = useStore($chunkFontSize);
@@ -29,14 +47,18 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
   const t = translations[currentLang] || translations.ar;
 
   const [isOpen, setIsOpen] = useState(true);
+  const [currentTheme, setCurrentTheme] = useState('emerald');
 
-  // Initialize and persist collapse state in localStorage
+  // Initialize and persist collapse state and active theme in localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('openbayan_card_controls_open');
-      if (saved !== null) {
-        setIsOpen(JSON.parse(saved));
+      const savedCard = localStorage.getItem('openbayan_card_controls_open');
+      if (savedCard !== null) {
+        setIsOpen(JSON.parse(savedCard));
       }
+      const savedTheme = localStorage.getItem('openbayan_theme') || 'emerald';
+      setCurrentTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
     } catch (e) {}
   }, []);
 
@@ -45,6 +67,14 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
     setIsOpen(next);
     try {
       localStorage.setItem('openbayan_card_controls_open', JSON.stringify(next));
+    } catch (e) {}
+  };
+
+  const handleThemeChange = (themeId: string) => {
+    setCurrentTheme(themeId);
+    document.documentElement.setAttribute('data-theme', themeId);
+    try {
+      localStorage.setItem('openbayan_theme', themeId);
     } catch (e) {}
   };
 
@@ -66,11 +96,11 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
       <button 
         type="button"
         onClick={toggleOpen}
-        className="flex items-center justify-between w-full font-bold text-base-content hover:text-emerald-800 dark:hover:text-emerald-400 transition-colors text-start focus:outline-none"
+        className="flex items-center justify-between w-full font-bold text-base-content hover:text-primary transition-colors text-start focus:outline-none"
         title={isOpen ? 'Collapse' : 'Expand'}
       >
         <div className="flex items-center gap-1.5">
-          <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
           </svg>
           <span>{t.displayControlsTitle}</span>
@@ -86,9 +116,80 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
 
       {/* Collapsible Content Body */}
       {isOpen && (
-        <div className="space-y-3 pt-2 border-t border-base-200/60">
-          {/* 1. Context Depth Switcher (2 Levels: 1: Snippet, 2: Context ±1) */}
+        <div className="space-y-3.5 pt-2 border-t border-base-200/60">
+          
+          {/* 1. Theme Controller Grid */}
           <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-base-content/70 font-semibold flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+                <span>السمة / Theme</span>
+              </span>
+              <span className="text-[10px] font-mono text-primary font-bold capitalize">
+                {currentTheme}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-1">
+              {THEMES.map((th) => {
+                const isSelected = currentTheme === th.id;
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    onClick={() => handleThemeChange(th.id)}
+                    className={`btn btn-xs rounded-lg transition-all flex flex-col h-auto py-1 px-0.5 gap-0.5 border ${
+                      isSelected
+                        ? 'btn-primary font-bold shadow-xs'
+                        : 'bg-base-200/80 hover:bg-base-200 text-base-content/80 border-base-200'
+                    }`}
+                    title={th.labelAr}
+                  >
+                    <span className="text-xs leading-none">{th.icon}</span>
+                    <span className="text-[9px] truncate w-full">{th.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Interface Language Switcher */}
+          <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
+            <div className="flex items-center justify-between">
+              <span className="text-base-content/70 font-semibold flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                <span>اللغة / Language</span>
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-1 bg-base-200/80 p-1 rounded-xl">
+              {LANGUAGES.map((l) => {
+                const isSelected = currentLang === l.code;
+                return (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => setLanguage(l.code)}
+                    className={`btn btn-xs rounded-lg border-0 transition-all font-sans gap-1 ${
+                      isSelected 
+                        ? 'btn-primary font-bold shadow-xs' 
+                        : 'btn-ghost text-base-content/70 hover:text-base-content'
+                    }`}
+                  >
+                    <span>{l.flag}</span>
+                    <span className="truncate">{l.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Context Depth Switcher (2 Levels: 1: Snippet, 2: Context ±1) */}
+          <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
             <div className="flex items-center justify-between">
               <span className="text-base-content/70 font-semibold">{t.depthLevelLabel}</span>
               <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-bold">
@@ -103,7 +204,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
                   onClick={() => setContextDepth(opt.id)}
                   className={`btn btn-xs rounded-lg border-0 transition-all font-sans ${
                     contextDepth === opt.id 
-                      ? 'bg-emerald-800 text-white font-bold shadow-xs' 
+                      ? 'btn-primary font-bold shadow-xs' 
                       : 'btn-ghost text-base-content/70 hover:text-base-content'
                   }`}
                 >
@@ -113,8 +214,8 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
             </div>
           </div>
 
-          {/* 2. Font Size Control */}
-          <div className="flex items-center justify-between pt-1 border-t border-base-200/50">
+          {/* 4. Font Size Control */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50">
             <span className="text-base-content/70 font-semibold">{t.fontSizeLabel}</span>
             <div className="join bg-base-200/80 rounded-lg p-0.5">
               {fontOptions.map((opt) => (
@@ -122,7 +223,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
                   key={opt.id}
                   type="button"
                   onClick={() => setChunkFontSize(opt.id)}
-                  className={`join-item btn btn-xs ${fontSize === opt.id ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
+                  className={`join-item btn btn-xs ${fontSize === opt.id ? 'btn-active btn-primary font-bold' : 'btn-ghost'}`}
                 >
                   {opt.label}
                 </button>
@@ -130,8 +231,8 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
             </div>
           </div>
 
-          {/* 3. Highlights Toggle */}
-          <div className="flex items-center justify-between pt-1 border-t border-base-200/50">
+          {/* 5. Highlights Toggle */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50">
             <span className="text-base-content/70 font-semibold">{t.highlightToggleLabel}</span>
             <button
               type="button"
@@ -155,8 +256,8 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
             </button>
           </div>
 
-          {/* 4. Card Density Toggle */}
-          <div className="flex items-center justify-between pt-1 border-t border-base-200/50">
+          {/* 6. Card Density Toggle */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50">
             <span className="text-base-content/70 font-semibold">{t.densityLabel}</span>
             <button
               type="button"

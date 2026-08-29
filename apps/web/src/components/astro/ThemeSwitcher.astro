@@ -1,0 +1,101 @@
+---
+interface Props {
+  className?: string;
+}
+
+const { className = '' } = Astro.props;
+
+const themes = [
+  { id: 'emerald', name: 'Emerald', labelAr: 'زمردي (افتراضي)', icon: '🌿' },
+  { id: 'retro', name: 'Retro', labelAr: 'مخطوطة تراثية', icon: '📜' },
+  { id: 'light', name: 'Light', labelAr: 'فاتح ناصع', icon: '☀️' },
+  { id: 'dark', name: 'Dark', labelAr: 'داكن مريح', icon: '🌙' },
+  { id: 'night', name: 'Night', labelAr: 'ليلي أزرق', icon: '🌌' },
+  { id: 'corporate', name: 'Corporate', labelAr: 'أكاديمي منضبط', icon: '🏛️' },
+  { id: 'winter', name: 'Winter', labelAr: 'شتوي بارد', icon: '❄️' },
+  { id: 'coffee', name: 'Coffee', labelAr: 'قهوة دافئة', icon: '☕' },
+];
+---
+
+<div class={`dropdown dropdown-end ${className}`} id="theme-switcher-dropdown">
+  <div 
+    tabindex="0" 
+    role="button" 
+    class="btn btn-ghost btn-xs sm:btn-sm gap-1.5 font-sans text-base-content/80 hover:text-base-content focus:outline-none"
+    title="Change Theme (تغيير السمة)"
+  >
+    <!-- Palette Icon -->
+    <svg class="w-4 h-4 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+    </svg>
+    <span class="hidden sm:inline text-xs font-semibold" id="current-theme-label">Theme</span>
+    <svg class="w-2.5 h-2.5 opacity-60 fill-current" viewBox="0 0 2048 2048">
+      <path d="M1799 349l242 241-1017 1017L7 590l242-241 775 775 775-775z"></path>
+    </svg>
+  </div>
+
+  <ul 
+    tabindex="0" 
+    class="dropdown-content z-50 p-2 shadow-2xl bg-base-100 border border-base-200 rounded-2xl w-52 space-y-1 font-sans text-xs max-h-80 overflow-y-auto"
+  >
+    {themes.map((th) => (
+      <li>
+        <label class="flex items-center justify-between p-2 rounded-xl hover:bg-base-200/80 cursor-pointer transition-colors group">
+          <div class="flex items-center gap-2">
+            <span class="text-sm">{th.icon}</span>
+            <div class="flex flex-col text-start">
+              <span class="font-bold text-base-content group-hover:text-primary">{th.name}</span>
+              <span class="text-[10px] text-base-content/60">{th.labelAr}</span>
+            </div>
+          </div>
+          <input 
+            type="radio" 
+            name="theme-dropdown" 
+            class="theme-controller radio radio-xs radio-primary" 
+            value={th.id}
+            data-theme-name={th.name}
+          />
+        </label>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<script>
+  // Theme state persistence & initialization
+  function setupThemeController() {
+    const THEME_KEY = 'openbayan_theme';
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'emerald';
+
+    // 1. Sync active radio input
+    const targetRadio = document.querySelector(`input[name="theme-dropdown"][value="${savedTheme}"]`) as HTMLInputElement | null;
+    if (targetRadio) {
+      targetRadio.checked = true;
+    }
+
+    // 2. Sync theme label in button if desired
+    const labelEl = document.getElementById('current-theme-label');
+    if (labelEl && targetRadio) {
+      labelEl.textContent = targetRadio.dataset.themeName || 'Theme';
+    }
+
+    // 3. Listen for theme selection
+    document.querySelectorAll('input[name="theme-dropdown"].theme-controller').forEach((input) => {
+      input.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.checked) {
+          const newTheme = target.value;
+          document.documentElement.setAttribute('data-theme', newTheme);
+          localStorage.setItem(THEME_KEY, newTheme);
+          if (labelEl) {
+            labelEl.textContent = target.dataset.themeName || 'Theme';
+          }
+        }
+      });
+    });
+  }
+
+  // Run on page load and on dynamic transitions
+  setupThemeController();
+  document.addEventListener('astro:page-load', setupThemeController);
+</script>

@@ -1,5 +1,4 @@
 ---
-import { LanguageSwitcher } from '../islands/LanguageSwitcher';
 import { translations, getLangFromUrl, type SupportedLanguage } from '../../lib/i18n';
 
 interface Props {
@@ -9,43 +8,145 @@ interface Props {
 const urlLang = getLangFromUrl(Astro.url);
 const currentLang = Astro.props.lang || urlLang;
 const t = translations[currentLang];
+const query = Astro.url.searchParams.get('q') || '';
+const mode = Astro.url.searchParams.get('mode') || 'hybrid';
+const category = Astro.url.searchParams.get('category') || '';
+const era = Astro.url.searchParams.get('era') || '';
+const tradition = Astro.url.searchParams.get('tradition') || '';
 ---
 
-<header class="sticky top-0 z-30 bg-base-100/90 backdrop-blur border-b border-base-200/80 transition-all">
-  <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-    <!-- Brand Logo -->
-    <a href={`/?lang=${currentLang}`} class="flex items-center gap-3 group">
-      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-        <span class="font-serif text-2xl font-bold">ب</span>
-      </div>
-      <div>
-        <span class="font-bold text-lg tracking-tight font-sans block leading-none text-base-content">{t.appName}</span>
-        <span class="text-xs text-base-content/60 font-sans tracking-wide">{t.appSubtitle}</span>
-      </div>
-    </a>
-
-    <!-- Navigation / Quick Links & Language Switcher -->
-    <nav class="flex items-center gap-2">
-      <a href={`/search?q=صحيح+البخاري&lang=${currentLang}`} class="btn btn-ghost btn-xs sm:btn-sm text-base-content/80 font-sans hidden sm:inline-flex">صحيح البخاري</a>
-      <a href={`/search?q=شرح+المجموع&lang=${currentLang}`} class="btn btn-ghost btn-xs sm:btn-sm text-base-content/80 font-sans hidden sm:inline-flex">المجموع</a>
-
-      <!-- Language Switcher Island -->
-      <LanguageSwitcher client:load currentLang={currentLang} />
-
-      <div class="divider divider-horizontal my-3 mx-0.5"></div>
-
-      <!-- GitHub Link -->
-      <a 
-        href="https://github.com" 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        class="btn btn-ghost btn-circle btn-sm text-base-content/70"
-        title="GitHub Repository"
-      >
-        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-        </svg>
+<header id="site-header" class="sticky top-0 z-30 bg-base-100/90 backdrop-blur border-b border-base-200/80 transition-all">
+  <div class="max-w-7xl w-full mx-auto px-4 h-16 flex items-center justify-between relative overflow-hidden">
+    
+    <!-- Brand Logo & Title (Centering by default, sliding to start on scroll) -->
+    <div id="navbar-brand-wrapper" class="flex items-center gap-3 transition-all duration-300 ease-out navbar-logo-centered z-10">
+      <a href={`/?lang=${currentLang}`} class="flex items-center gap-3 group">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
+          <span class="font-serif text-xl sm:text-2xl font-bold">ب</span>
+        </div>
+        <div class="flex flex-col text-start">
+          <span class="font-bold text-base sm:text-lg tracking-tight font-sans block leading-none text-base-content">{t.appName}</span>
+          <span class="text-[10px] sm:text-xs text-base-content/60 font-sans tracking-wide truncate">{t.appSubtitle}</span>
+        </div>
       </a>
-    </nav>
+    </div>
+
+    <!-- Mini Navbar Search Bar (Hidden by default, slides/fades in on the end side on scroll) -->
+    <div id="navbar-search-wrapper" class="navbar-search-hidden flex items-center ms-auto transition-all duration-300 ease-out w-full max-w-xs sm:max-w-sm md:max-w-md ps-4">
+      <form action="/search" method="GET" class="w-full relative flex items-center font-sans">
+        <input type="hidden" name="lang" value={currentLang} />
+        <input type="hidden" name="mode" value={mode} />
+        {category && <input type="hidden" name="category" value={category} />}
+        {era && <input type="hidden" name="era" value={era} />}
+        {tradition && <input type="hidden" name="tradition" value={tradition} />}
+
+        <div class="relative w-full flex items-center">
+          <input
+            id="navbar-search-input"
+            type="text"
+            name="q"
+            value={query}
+            placeholder={t.searchPlaceholder}
+            class="input input-sm w-full bg-base-200/90 focus:bg-base-100 rounded-xl border border-base-300 focus:border-emerald-700 text-xs font-sans ps-8 pe-8 text-base-content transition-all shadow-xs"
+          />
+          <!-- Leading Search Icon -->
+          <div class="absolute start-2.5 top-1/2 -translate-y-1/2 text-base-content/50 pointer-events-none">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <!-- Submit Button -->
+          <button 
+            type="submit" 
+            class="absolute end-1.5 top-1/2 -translate-y-1/2 btn btn-xs btn-circle btn-ghost text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-950"
+            title={t.searchBtn}
+          >
+            <svg class="w-3.5 h-3.5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+
   </div>
 </header>
+
+<style>
+  /* Initial State: Logo centered */
+  .navbar-logo-centered {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* Scrolled State: Logo moves to start */
+  .navbar-logo-scrolled {
+    position: relative;
+    left: 0;
+    transform: translateX(0);
+  }
+
+  /* Initial State: Search hidden */
+  .navbar-search-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px) scale(0.95);
+  }
+
+  /* Scrolled State: Search visible */
+  .navbar-search-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+</style>
+
+<script>
+  function setupNavbarScrollAnimation() {
+    const brandWrapper = document.getElementById('navbar-brand-wrapper');
+    const searchWrapper = document.getElementById('navbar-search-wrapper');
+    const mainSearchContainer = document.getElementById('main-search-container');
+
+    if (!brandWrapper || !searchWrapper) return;
+
+    function handleScrollState(isScrolled: boolean) {
+      if (isScrolled) {
+        brandWrapper.classList.remove('navbar-logo-centered');
+        brandWrapper.classList.add('navbar-logo-scrolled');
+        searchWrapper.classList.remove('navbar-search-hidden');
+        searchWrapper.classList.add('navbar-search-visible');
+      } else {
+        brandWrapper.classList.add('navbar-logo-centered');
+        brandWrapper.classList.remove('navbar-logo-scrolled');
+        searchWrapper.classList.add('navbar-search-hidden');
+        searchWrapper.classList.remove('navbar-search-visible');
+      }
+    }
+
+    // Use IntersectionObserver if main-search-container exists
+    if (mainSearchContainer) {
+      const observer = new IntersectionObserver((entries) => {
+        const entry = entries[0];
+        // If main search is NOT intersecting (scrolled out of view), activate navbar search
+        handleScrollState(!entry.isIntersecting);
+      }, {
+        root: null,
+        threshold: 0.1,
+        rootMargin: '-64px 0px 0px 0px' // Header height offset
+      });
+
+      observer.observe(mainSearchContainer);
+    } else {
+      // Fallback scroll listener
+      const onScroll = () => {
+        handleScrollState(window.scrollY > 90);
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    }
+  }
+
+  setupNavbarScrollAnimation();
+  document.addEventListener('astro:page-load', setupNavbarScrollAnimation);
+</script>

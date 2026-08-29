@@ -32,6 +32,16 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
 
+    <!-- Instant Early Theme Application to avoid FOUC -->
+    <script is:inline>
+      (function() {
+        try {
+          const savedTheme = localStorage.getItem('openbayan_theme') || 'emerald';
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        } catch(e) {}
+      })();
+    </script>
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
@@ -46,7 +56,7 @@ const {
       <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     )}
   </head>
-  <body class="min-h-screen flex flex-col antialiased selection:bg-emerald-200 selection:text-emerald-900">
+  <body class="min-h-screen flex flex-col antialiased bg-base-100 text-base-content selection:bg-emerald-200 selection:text-emerald-900">
     <Header lang={currentLang} />
     
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:py-8">
@@ -102,12 +112,8 @@ const {
 
           navigator.clipboard.writeText(prompt);
 
-          // Trigger Toast
           const toastEl = document.getElementById('global-toast');
-          const toastText = document.getElementById('global-toast-text');
-          if (toastEl && toastText) {
-            const lang = $currentLang.get();
-            toastText.textContent = lang === 'en' ? 'Prompt copied for AI!' : lang === 'id' ? 'Kutipan disalin untuk AI!' : 'تم نسخ بطاقة الاستشهاد للذكاء الاصطناعي!';
+          if (toastEl) {
             toastEl.classList.remove('hidden');
             setTimeout(() => toastEl.classList.add('hidden'), 3000);
           }

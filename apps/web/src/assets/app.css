@@ -1,5 +1,7 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: all;
+}
 
 @import "@fontsource/amiri/400.css";
 @import "@fontsource/amiri/700.css";
@@ -11,16 +13,6 @@
 :root {
   --font-amiri: 'Amiri', serif;
   --font-sans: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --bg-paper: #fcfbf7;
-  --bg-card: #ffffff;
-  --border-subtle: #e8e4d9;
-}
-
-[data-theme="dark"],
-.dark {
-  --bg-paper: #131618;
-  --bg-card: #1c2024;
-  --border-subtle: #2d3339;
 }
 
 html {
@@ -30,13 +22,9 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--bg-paper);
-  color: #2b2b2b;
   min-height: 100vh;
-}
-
-[data-theme="dark"] body {
-  color: #e2e8f0;
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
 }
 
 /* Classical Scholarly Arabic Matn Styling */
@@ -68,13 +56,13 @@ body {
 .hide-highlights mark {
   background-color: transparent !important;
   color: inherit !important;
-  font-weight: normal !important;
   padding: 0 !important;
+  border-radius: 0 !important;
 }
 
 .chunk-font-sm .arabic-matn {
-  font-size: 0.95rem !important;
-  line-height: 1.95 !important;
+  font-size: 0.925rem !important;
+  line-height: 2.0 !important;
 }
 
 .chunk-font-base .arabic-matn {
@@ -83,91 +71,66 @@ body {
 }
 
 .chunk-font-lg .arabic-matn {
-  font-size: 1.35rem !important;
+  font-size: 1.325rem !important;
   line-height: 2.5 !important;
 }
 
 .chunk-font-xl .arabic-matn {
-  font-size: 1.6rem !important;
+  font-size: 1.55rem !important;
   line-height: 2.7 !important;
 }
 
+/* Compact density */
 .compact-results article {
-  padding: 1rem 1.25rem !important;
-  border-radius: 1rem !important;
+  margin-bottom: 0.75rem !important;
 }
 
-.compact-results .arabic-matn {
-  line-height: 1.9 !important;
+.compact-results .card-body {
+  padding: 1rem !important;
 }
 
-/* Context Depth Levels */
-/* Default / Level 1 (Snippet): Strictly hide preceding and succeeding context */
+/* Context Depth Modes (Snippet vs Discourse Context) */
+.depth-level-1 .preceding-discourse-block,
+.depth-level-1 .succeeding-discourse-block {
+  display: none !important;
+}
+
+.depth-level-2 .preceding-discourse-block,
+.depth-level-2 .succeeding-discourse-block {
+  display: block !important;
+}
+
+/* Page Break Divider for Merged Sibling Passages */
+.page-divider {
+  border: 0;
+  border-top: 1px dashed rgba(16, 185, 129, 0.4);
+  position: relative;
+  margin: 1.5rem 0;
+}
+
+.page-divider::before {
+  content: "تابع الصفحة التالية";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-base-100, #ffffff);
+  padding: 0 0.75rem;
+  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  color: rgba(16, 185, 129, 0.8);
+  font-weight: 700;
+  border-radius: 9999px;
+  border: 1px dashed rgba(16, 185, 129, 0.3);
+}
+
+/* Ensure discourse blocks are hidden by default before JS hydration */
 .preceding-discourse-block,
 .succeeding-discourse-block {
   display: none !important;
 }
 
-.focus-discourse-block {
-  background-color: transparent !important;
-  border-inline-start-width: 0 !important;
-  padding: 0 !important;
-  box-shadow: none !important;
-}
-
-/* Level 2: Context Mode (Show preceding & succeeding blocks like mockup) */
-#search-results-container.depth-level-2 .preceding-discourse-block,
-#search-results-container.depth-level-2 .succeeding-discourse-block {
-  display: block !important;
-}
-
-#search-results-container.depth-level-2 .focus-discourse-block {
-  background-color: rgba(16, 185, 129, 0.08) !important;
-  border-inline-start-width: 4px !important;
-  border-inline-start-color: #047857 !important;
-  border-radius: 0.75rem !important;
-  padding: 0.875rem 1rem !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Visual Page Divider for Merged Sibling Passages */
-.page-divider {
-  border: 0;
-  height: 1px;
-  background: linear-gradient(to left, transparent, #c5bc9f, transparent);
-  margin: 1.5rem 0;
-  position: relative;
-}
-
-.page-divider::after {
-  content: "§";
-  position: absolute;
-  top: -0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--bg-card);
-  padding: 0 0.5rem;
-  color: #8c8266;
-  font-size: 0.85rem;
-  font-family: var(--font-amiri);
-}
-
-/* Footnotes Styling */
-.footnote-ref {
-  font-size: 0.75rem;
-  vertical-align: super;
-  color: #0284c7;
-  text-decoration: none;
-  font-family: var(--font-sans);
-  font-weight: 600;
-  margin: 0 0.15rem;
-}
-
-.footnote-ref:hover {
-  text-decoration: underline;
-}
-
-/* Smooth custom scrollbars */
+/* Scrollbar refinement */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -178,10 +141,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(140, 130, 102, 0.3);
-  border-radius: 9999px;
+  background: rgba(150, 150, 150, 0.25);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(140, 130, 102, 0.6);
+  background: rgba(150, 150, 150, 0.45);
 }

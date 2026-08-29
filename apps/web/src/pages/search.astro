@@ -89,7 +89,7 @@ const hasActiveFilters = Boolean(category || era || tradition);
 <BaseLayout title={pageTitle} lang={currentLang}>
   <div class="space-y-6">
     <!-- Top Search Header -->
-    <div class="py-2 max-w-4xl mx-auto">
+    <div id="main-search-container" class="py-2 max-w-4xl mx-auto">
       <SearchBar 
         client:load 
         initialQuery={query} 
