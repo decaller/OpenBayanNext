@@ -5,6 +5,10 @@ import {
   type ChunkDetailResponse, 
   type SurroundingContextResponse 
 } from '../../lib/api';
+import { translations, getLangFromUrl } from '../../lib/i18n';
+
+const currentLang = getLangFromUrl(Astro.url);
+const t = translations[currentLang];
 
 const { id } = Astro.params;
 const chunkId = parseInt(id || '0', 10);
@@ -34,7 +38,7 @@ try {
     surrounding = await surroundingRes.json();
   }
 } catch (err: any) {
-  error = `خطأ في الاتصال بالخادم الداخلي: ${err?.message || err}`;
+  error = err?.message || 'Connection Error';
 }
 
 if (!chunk && !error) {
@@ -63,25 +67,29 @@ const jsonLd = chunk ? {
 
 const pageTitle = chunk 
   ? `${chunk.section_title} | ${chunk.book_name} (${chunk.volume_page})`
-  : 'بيان | قراءة مقتطف';
+  : `${t.appName} | ${t.permalink}`;
+
+const turathUrl = chunk ? `https://turath.io/book/${chunk.book_id}` : '#';
+const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
 ---
 
 <BaseLayout 
   title={pageTitle} 
   description={chunk?.raw_text.slice(0, 160)}
   jsonLd={jsonLd}
+  lang={currentLang}
 >
   {error ? (
     <div class="alert alert-error my-12 max-w-2xl mx-auto shadow-sm font-sans">
       <span>{error}</span>
     </div>
   ) : chunk && (
-    <div class="max-w-3xl mx-auto space-y-8 py-4">
+    <div class="max-w-4xl mx-auto space-y-8 py-4">
       <!-- Breadcrumb Navigation -->
       <nav class="flex items-center gap-2 text-xs font-sans text-base-content/60 overflow-x-auto pb-2">
-        <a href="/" class="hover:text-emerald-700">الرئيسية</a>
+        <a href={`/?lang=${currentLang}`} class="hover:text-emerald-700">{t.appName}</a>
         <span>/</span>
-        <a href={`/search?q=${encodeURIComponent(chunk.book_name)}`} class="hover:text-emerald-700">{chunk.book_name}</a>
+        <a href={`/search?q=${encodeURIComponent(chunk.book_name)}&lang=${currentLang}`} class="hover:text-emerald-700">{chunk.book_name}</a>
         <span>/</span>
         <span class="text-base-content/90 font-medium truncate">{chunk.section_title}</span>
       </nav>
@@ -90,16 +98,27 @@ const pageTitle = chunk
       <article class="bg-base-100 border border-base-200/90 rounded-3xl p-6 sm:p-10 shadow-xs space-y-6">
         <!-- Bibliographic Header -->
         <header class="border-b border-base-200 pb-6">
-          <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-2 font-sans">
             <span class="badge badge-lg badge-neutral font-mono font-bold text-xs">
               {chunk.volume_page}
             </span>
 
-            <div class="flex items-center gap-2 font-sans text-xs text-base-content/60">
-              <span>التصنيف: <strong>{chunk.category_name}</strong></span>
-              <span>•</span>
-              <span>المؤلف: <strong>{chunk.author_name}</strong> (ت: {chunk.author_death_hijri} هـ)</span>
+            <!-- External Editions Links -->
+            <div class="flex items-center gap-2 text-xs">
+              <span class="text-base-content/50">{t.onlineBook}</span>
+              <a href={turathUrl} target="_blank" rel="noopener noreferrer" class="badge badge-sm badge-outline hover:badge-primary">
+                {t.turathLink}
+              </a>
+              <a href={shamelaUrl} target="_blank" rel="noopener noreferrer" class="badge badge-sm badge-outline hover:badge-primary">
+                {t.shamelaLink}
+              </a>
             </div>
+          </div>
+
+          <div class="text-xs font-sans text-base-content/60 mt-2">
+            <span>التصنيف: <strong>{chunk.category_name}</strong></span>
+            <span class="mx-2">•</span>
+            <span>المؤلف: <strong>{chunk.author_name}</strong> (ت: {chunk.author_death_hijri} هـ)</span>
           </div>
 
           <h1 class="text-2xl sm:text-3xl font-bold font-sans text-emerald-950 dark:text-emerald-300 leading-snug mt-3">
@@ -111,22 +130,39 @@ const pageTitle = chunk
         </header>
 
         <!-- Classical Text Body (Amiri Font, Line Height 2.3) -->
-        <div class="arabic-matn text-lg sm:text-xl text-base-content/90 leading-loose py-2">
+        <div class="arabic-matn text-lg sm:text-xl text-base-content/90 leading-loose py-2" dir="rtl">
           {chunk.raw_text}
         </div>
 
         <!-- Footnotes Section if present -->
         {chunk.footnotes && (
-          <footer class="mt-8 pt-6 border-t border-dashed border-base-300 font-sans text-xs sm:text-sm text-base-content/70 space-y-2 bg-base-200/20 p-4 rounded-xl">
-            <h4 class="font-bold text-base-content/90 text-xs">الحواشي والهوامش:</h4>
+          <footer class="mt-8 pt-6 border-t border-dashed border-base-300 font-sans text-xs sm:text-sm text-base-content/70 space-y-2 bg-base-200/20 p-4 rounded-xl" dir="rtl">
+            <h4 class="font-bold text-base-content/90 text-xs">{t.footnotesTitle}</h4>
             <p class="leading-relaxed whitespace-pre-line">{chunk.footnotes}</p>
           </footer>
         )}
 
-        <!-- Bottom Action Bar (Opens Chapter Drawer) -->
+        <!-- Bottom Action Bar: Copy for AI & Open Chapter Drawer -->
         <div class="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-base-200 font-sans text-xs">
-          <span class="text-base-content/50">رابط معتمد للتناقل والاقتباس الأكاديمي</span>
+          <!-- Copy for AI Button -->
+          <button
+            type="button"
+            class="btn btn-sm btn-ghost text-base-content/70 hover:text-emerald-800 gap-1.5"
+            data-copy-ai
+            data-chunk-id={chunk.chunk_id}
+            data-book-name={chunk.book_name}
+            data-volume-page={chunk.volume_page}
+            data-breadcrumb={chunk.breadcrumb}
+            data-raw-text={chunk.raw_text}
+            data-footnotes={chunk.footnotes || ''}
+          >
+            <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>{t.copyForAI}</span>
+          </button>
 
+          <!-- Drawer Trigger -->
           <button 
             type="button"
             class="btn btn-sm btn-outline btn-success hover:!bg-emerald-800 hover:!text-white gap-2 font-bold"
@@ -137,7 +173,7 @@ const pageTitle = chunk
             data-breadcrumb={chunk.breadcrumb}
             data-chunk-id={chunk.chunk_id}
           >
-            <span>مطالعة الباب كاملاً في الدرج الجانبي</span>
+            <span>{t.readFullChapter}</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
@@ -164,8 +200,8 @@ const pageTitle = chunk
                       : 'bg-base-100/70 border-base-200/80'
                   }`}
                 >
-                  <div class="flex items-center justify-between text-xs font-mono text-base-content/50 mb-2 pb-1 border-b border-base-200/40">
-                    <span class="font-bold text-emerald-800 dark:text-emerald-400">
+                  <div class="flex items-center justify-between text-xs font-mono text-base-content/50 mb-2 pb-1 border-b border-base-200/40 font-sans">
+                    <span class="font-bold text-emerald-800 dark:text-emerald-400 font-mono">
                       {item.volume_page} {isCurrent && '(الموضع الحالي)'}
                     </span>
                     {!item.is_same_section && (
@@ -175,13 +211,13 @@ const pageTitle = chunk
                     )}
                   </div>
 
-                  <div class="arabic-matn text-base sm:text-lg text-base-content/80 leading-relaxed">
+                  <div class="arabic-matn text-base sm:text-lg text-base-content/80 leading-relaxed" dir="rtl">
                     {item.raw_text.slice(0, 250)}...
                   </div>
 
                   {!isCurrent && (
-                    <div class="mt-2 text-left">
-                      <a href={`/p/${item.chunk_id}`} class="btn btn-ghost btn-xs text-emerald-800 text-[11px] font-sans">
+                    <div class="mt-2 text-start">
+                      <a href={`/p/${item.chunk_id}?lang=${currentLang}`} class="btn btn-ghost btn-xs text-emerald-800 text-[11px] font-sans">
                         انتقل إلى هذا الموضع ←
                       </a>
                     </div>

@@ -2,23 +2,30 @@
 import Header from '../components/astro/Header.astro';
 import Footer from '../components/astro/Footer.astro';
 import { CitationDrawer } from '../components/islands/CitationDrawer';
+import { translations, getLangFromUrl, type SupportedLanguage } from '../lib/i18n';
 import '../assets/app.css';
 
 interface Props {
   title?: string;
   description?: string;
   jsonLd?: Record<string, any>;
+  lang?: SupportedLanguage;
 }
 
+const urlLang = getLangFromUrl(Astro.url);
+const currentLang = Astro.props.lang || urlLang;
+const t = translations[currentLang];
+const isRtl = currentLang === 'ar';
+
 const {
-  title = "بيان | محرك بحث وقراءة للتراث الإسلامي",
-  description = "محرك بحث وقراءة فائق السرعة لمتون وشروح الحديث والفقه والعقيدة والتفسير بتقنيات البحث الهجين FTS5 و Dense Vectors.",
+  title = `${t.appName} | ${t.appSubtitle}`,
+  description = t.heroSubtitle,
   jsonLd,
 } = Astro.props;
 ---
 
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" data-theme="emerald">
+<html lang={currentLang} dir={isRtl ? 'rtl' : 'ltr'} data-theme="emerald">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -32,7 +39,7 @@ const {
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:locale" content="ar_AR" />
+    <meta property="og:locale" content={currentLang === 'ar' ? 'ar_AR' : currentLang === 'id' ? 'id_ID' : 'en_US'} />
 
     <!-- Schema.org JSON-LD if present (for 0-JS permalinks) -->
     {jsonLd && (
@@ -40,34 +47,70 @@ const {
     )}
   </head>
   <body class="min-h-screen flex flex-col antialiased selection:bg-emerald-200 selection:text-emerald-900">
-    <Header />
+    <Header lang={currentLang} />
     
-    <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:py-8">
       <slot />
     </main>
 
-    <Footer />
+    <Footer lang={currentLang} />
 
     <!-- Global Citation Drawer Island (Hydrated on idle) -->
     <CitationDrawer client:idle />
 
-    <!-- Global Static HTML to Nanostores Event Delegator (0 KB JS Card Bridge) -->
+    <!-- Toast Notification Container -->
+    <div id="global-toast" class="toast toast-bottom toast-center z-50 hidden">
+      <div class="alert alert-success text-xs font-bold font-sans shadow-lg py-2 px-4">
+        <span id="global-toast-text">تم النسخ بنجاح!</span>
+      </div>
+    </div>
+
+    <!-- Global Static HTML Bridge: Open Drawer & Copy for AI Delegation -->
     <script>
-      import { openChapterDrawer } from '../stores/workspace';
+      import { openChapterDrawer, $currentLang } from '../stores/workspace';
+      import { formatAIPassagePrompt } from '../lib/i18n';
 
+      // 1. Open Chapter Drawer Delegation
       document.addEventListener('click', (e) => {
-        const target = (e.target as HTMLElement).closest('[data-open-drawer]');
-        if (!target) return;
+        const drawerBtn = (e.target as HTMLElement).closest('[data-open-drawer]');
+        if (drawerBtn) {
+          const dataset = (drawerBtn as HTMLElement).dataset;
+          if (dataset.bookId && dataset.sectionId && dataset.sectionTitle) {
+            openChapterDrawer({
+              bookId: Number(dataset.bookId),
+              sectionId: dataset.sectionId,
+              sectionTitle: dataset.sectionTitle,
+              breadcrumb: dataset.breadcrumb || dataset.sectionTitle,
+              focusChunkId: dataset.chunkId ? Number(dataset.chunkId) : undefined,
+            });
+          }
+          return;
+        }
 
-        const dataset = (target as HTMLElement).dataset;
-        if (dataset.bookId && dataset.sectionId && dataset.sectionTitle) {
-          openChapterDrawer({
-            bookId: Number(dataset.bookId),
-            sectionId: dataset.sectionId,
-            sectionTitle: dataset.sectionTitle,
-            breadcrumb: dataset.breadcrumb || dataset.sectionTitle,
-            focusChunkId: dataset.chunkId ? Number(dataset.chunkId) : undefined,
-          });
+        // 2. Copy for AI Delegation
+        const copyAiBtn = (e.target as HTMLElement).closest('[data-copy-ai]');
+        if (copyAiBtn) {
+          const dataset = (copyAiBtn as HTMLElement).dataset;
+          const prompt = formatAIPassagePrompt({
+            chunk_id: Number(dataset.chunkId),
+            book_name: dataset.bookName || '',
+            volume_page: dataset.volumePage || '',
+            breadcrumb: dataset.breadcrumb || '',
+            raw_text: dataset.rawText || '',
+            footnotes: dataset.footnotes || null,
+          }, $currentLang.get());
+
+          navigator.clipboard.writeText(prompt);
+
+          // Trigger Toast
+          const toastEl = document.getElementById('global-toast');
+          const toastText = document.getElementById('global-toast-text');
+          if (toastEl && toastText) {
+            const lang = $currentLang.get();
+            toastText.textContent = lang === 'en' ? 'Prompt copied for AI!' : lang === 'id' ? 'Kutipan disalin untuk AI!' : 'تم نسخ بطاقة الاستشهاد للذكاء الاصطناعي!';
+            toastEl.classList.remove('hidden');
+            setTimeout(() => toastEl.classList.add('hidden'), 3000);
+          }
         }
       });
     </script>

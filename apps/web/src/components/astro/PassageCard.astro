@@ -1,17 +1,29 @@
 ---
 import type { SearchResultItem } from '../../lib/api';
+import { translations, type SupportedLanguage } from '../../lib/i18n';
+import { highlightQueryTerms } from '../../lib/highlighter';
 
 interface Props {
   chunk: SearchResultItem;
   rankIndex?: number;
+  lang?: SupportedLanguage;
+  searchQuery?: string;
 }
 
-const { chunk, rankIndex } = Astro.props;
+const { chunk, rankIndex, lang = 'ar', searchQuery = '' } = Astro.props;
+const t = translations[lang];
 
-// Format snippet with highlighted tags
-const formattedSnippet = chunk.text_snippet
+// Strip existing internal title tags
+const rawSnippet = chunk.text_snippet
   .replace(/<span data-type=['"]title['"].*?>.*?<\/span>/g, '')
   .trim();
+
+// Apply visual highlight to search terms
+const highlightedSnippet = highlightQueryTerms(rawSnippet, searchQuery);
+
+// External Library URLs based on book_id and chunk_id
+const turathUrl = `https://turath.io/book/${chunk.book_id}`;
+const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
 ---
 
 <article 
@@ -35,12 +47,12 @@ const formattedSnippet = chunk.text_snippet
         </span>
         {chunk.is_merged && (
           <span class="badge badge-xs badge-success badge-outline">
-            صفحتان متتاليتان
+            {t.consecutivePages}
           </span>
         )}
       </div>
 
-      <!-- Relevance / RRF Tag -->
+      <!-- Relevance Score -->
       <div class="text-base-content/50 text-[11px] font-mono">
         RRF: {chunk.rrf_score.toFixed(4)}
       </div>
@@ -54,49 +66,93 @@ const formattedSnippet = chunk.text_snippet
       <span>{chunk.breadcrumb}</span>
     </div>
 
-    <!-- Main Classical Text (Amiri Font) -->
-    <div class="arabic-matn text-base sm:text-lg text-base-content/90 my-2 leading-loose">
-      {formattedSnippet}
-    </div>
+    <!-- Main Classical Text (Always RTL with Amiri Font) -->
+    <div 
+      class="arabic-matn text-base sm:text-lg text-base-content/90 my-2 leading-loose" 
+      dir="rtl"
+      set:html={highlightedSnippet}
+    />
 
     <!-- Footnotes Preview if present -->
     {chunk.footnotes && (
-      <div class="mt-2 pt-2 border-t border-dashed border-base-200 text-xs font-sans text-base-content/60 leading-relaxed bg-base-200/20 rounded-lg p-2.5">
-        <span class="font-bold text-base-content/70">حاشية: </span>
+      <div class="mt-2 pt-2 border-t border-dashed border-base-200 text-xs font-sans text-base-content/60 leading-relaxed bg-base-200/20 rounded-lg p-2.5" dir="rtl">
+        <span class="font-bold text-base-content/70">{t.footnotesTitle} </span>
         <span>{chunk.footnotes.slice(0, 160)}...</span>
       </div>
     )}
 
-    <!-- Bottom Actions Bar (0 KB JS Bridge to Nanostores & Permalinks) -->
-    <div class="flex items-center justify-between pt-3 mt-1 border-t border-base-200/60 font-sans">
-      <!-- 0-JS Permalink Link -->
-      <a 
-        href={`/p/${chunk.chunk_id}`} 
-        class="btn btn-ghost btn-xs text-base-content/70 hover:text-emerald-700 gap-1"
-        title="رابط دائم للصفحة والمحيط الكامل"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-        </svg>
-        <span>رابط المقتطف</span>
-      </a>
+    <!-- Bottom Actions Bar: External Editions, Copy for AI & Chapter Drawer -->
+    <div class="flex flex-wrap items-center justify-between pt-3 mt-1 border-t border-base-200/60 font-sans gap-2">
+      <!-- Left: External Library Badges -->
+      <div class="flex items-center gap-1.5 flex-wrap text-xs">
+        <span class="text-[11px] text-base-content/50 hidden sm:inline">{t.onlineBook}</span>
+        <a 
+          href={turathUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="badge badge-sm badge-outline hover:badge-primary text-[11px] gap-1 transition-colors"
+          title="Open Book on Turath.io"
+        >
+          <span>{t.turathLink}</span>
+        </a>
+        <a 
+          href={shamelaUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="badge badge-sm badge-outline hover:badge-primary text-[11px] gap-1 transition-colors"
+          title="Open Book on Shamela.ws"
+        >
+          <span>{t.shamelaLink}</span>
+        </a>
+      </div>
 
-      <!-- Level-3 Full Chapter Drawer Trigger (Static HTML Data Attribute) -->
-      <button 
-        type="button"
-        class="btn btn-sm btn-outline btn-success hover:!bg-emerald-800 hover:!text-white gap-1.5 font-bold"
-        data-open-drawer
-        data-book-id={chunk.book_id}
-        data-section-id={chunk.section_id}
-        data-section-title={chunk.section_title}
-        data-breadcrumb={chunk.breadcrumb}
-        data-chunk-id={chunk.chunk_id}
-      >
-        <span>مطالعة الباب كاملاً</span>
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-        </svg>
-      </button>
+      <!-- Right: Copy for AI, Permalink & Chapter Drawer Bridge -->
+      <div class="flex items-center gap-2">
+        <!-- Copy for AI Button -->
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs text-base-content/70 hover:text-emerald-800 gap-1"
+          data-copy-ai
+          data-chunk-id={chunk.chunk_id}
+          data-book-name={chunk.book_name}
+          data-volume-page={chunk.volume_page}
+          data-breadcrumb={chunk.breadcrumb}
+          data-raw-text={chunk.full_text || rawSnippet}
+          data-footnotes={chunk.footnotes || ''}
+          title={t.copyForAI}
+        >
+          <svg class="w-3.5 h-3.5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span class="hidden sm:inline">{t.copyForAI}</span>
+        </button>
+
+        <!-- Permalink Link -->
+        <a 
+          href={`/p/${chunk.chunk_id}?lang=${lang}`} 
+          class="btn btn-ghost btn-xs text-base-content/70 hover:text-emerald-700 gap-1"
+          title={t.permalink}
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          <span>{t.permalink}</span>
+        </a>
+
+        <!-- Level-3 Chapter Drawer Trigger -->
+        <button 
+          type="button"
+          class="btn btn-sm btn-outline btn-success hover:!bg-emerald-800 hover:!text-white gap-1.5 font-bold"
+          data-open-drawer
+          data-book-id={chunk.book_id}
+          data-section-id={chunk.section_id}
+          data-section-title={chunk.section_title}
+          data-breadcrumb={chunk.breadcrumb}
+          data-chunk-id={chunk.chunk_id}
+        >
+          <span>{t.readFullChapter}</span>
+        </button>
+      </div>
     </div>
   </div>
 </article>

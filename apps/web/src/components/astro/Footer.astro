@@ -1,16 +1,25 @@
 ---
+import { translations, getLangFromUrl, type SupportedLanguage } from '../../lib/i18n';
+
+interface Props {
+  lang?: SupportedLanguage;
+}
+
+const urlLang = getLangFromUrl(Astro.url);
+const currentLang = Astro.props.lang || urlLang;
+const t = translations[currentLang];
 ---
 
 <footer class="mt-20 border-t border-base-200/80 bg-base-100/50 py-10 font-sans">
-  <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-base-content/70">
+  <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-base-content/70">
     <div class="flex items-center gap-2">
       <div class="w-6 h-6 rounded-md bg-emerald-800 text-white flex items-center justify-center font-serif text-sm font-bold">ب</div>
-      <span><strong>بيان (OpenBayan)</strong> — محرك بحث وقراءة للتراث الإسلامي الأصيل</span>
+      <span><strong>{t.appName}</strong> — {t.appSubtitle}</span>
     </div>
     
     <div class="flex items-center gap-6">
-      <span>٦٠ كتاباً معتمداً • ٩٧ ألف عنوان وفصل • ٧٦ ألف صفحة</span>
-      <span>محرك محلي فائق السرعة (FTS5 + Dense Vectors)</span>
+      <span>{t.footerStats}</span>
+      <span class="hidden md:inline">{t.footerEngine}</span>
     </div>
   </div>
 </footer>

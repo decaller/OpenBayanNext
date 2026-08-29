@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { translations, type SupportedLanguage } from '../../lib/i18n';
 
 interface SearchBarProps {
   initialQuery?: string;
   initialMode?: 'hybrid' | 'fts' | 'vector';
   size?: 'normal' | 'large';
   autoFocus?: boolean;
+  lang?: SupportedLanguage;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -12,10 +14,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   initialMode = 'hybrid',
   size = 'normal',
   autoFocus = false,
+  lang = 'ar',
 }) => {
   const [query, setQuery] = useState(initialQuery);
   const [mode, setMode] = useState<'hybrid' | 'fts' | 'vector'>(initialMode);
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = translations[lang] || translations.ar;
 
   useEffect(() => {
     // Keyboard shortcut '/' to focus search bar
@@ -32,7 +36,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    const url = `/search?q=${encodeURIComponent(query.trim())}&mode=${mode}&page=1`;
+    const url = `/search?q=${encodeURIComponent(query.trim())}&mode=${mode}&page=1&lang=${lang}`;
     window.location.href = url;
   };
 
@@ -44,7 +48,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Search Icon */}
         <div className="pl-3 pr-2 text-emerald-800/60 flex items-center">
           <svg className={isLarge ? "w-6 h-6" : "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
 
@@ -54,7 +58,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="ابحث في المتون وشروح الحديث والفقه والتفسير... (مثال: شروط بيع السلم، إنما الأعمال بالنيات)"
+          placeholder={t.searchPlaceholder}
           autoFocus={autoFocus}
           className={`w-full bg-transparent outline-none font-sans text-base-content placeholder:text-base-content/40 ${isLarge ? 'text-base sm:text-lg py-2' : 'text-sm sm:text-base py-1'}`}
         />
@@ -73,43 +77,43 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Submit Button */}
         <button
           type="submit"
-          className={`btn btn-emerald bg-emerald-800 hover:bg-emerald-900 text-white font-bold rounded-xl mr-2 ${isLarge ? 'px-6 btn-md' : 'px-4 btn-sm'}`}
+          className={`btn btn-emerald bg-emerald-800 hover:bg-emerald-900 text-white font-bold rounded-xl mx-2 ${isLarge ? 'px-6 btn-md' : 'px-4 btn-sm'}`}
         >
-          بحث
+          {t.searchBtn}
         </button>
       </div>
 
       {/* Mode Selector Pills */}
       <div className="flex items-center justify-between mt-2.5 px-2 text-xs text-base-content/60">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-base-content/70">نوع البحث:</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-base-content/70">{t.searchType}</span>
           <div className="join bg-base-200/60 p-0.5 rounded-lg border border-base-300/40">
             <button
               type="button"
               onClick={() => setMode('hybrid')}
               className={`join-item btn btn-xs border-0 ${mode === 'hybrid' ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
             >
-              هجين (RRF)
+              {t.modeHybrid}
             </button>
             <button
               type="button"
               onClick={() => setMode('fts')}
               className={`join-item btn btn-xs border-0 ${mode === 'fts' ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
             >
-              لفظي دقيق (FTS5)
+              {t.modeFts}
             </button>
             <button
               type="button"
               onClick={() => setMode('vector')}
               className={`join-item btn btn-xs border-0 ${mode === 'vector' ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
             >
-              دلالي معنوي (E5)
+              {t.modeVector}
             </button>
           </div>
         </div>
 
         <span className="hidden sm:inline-block text-[11px] opacity-70">
-          اضغط <kbd className="kbd kbd-xs">/</kbd> للبحث السريع
+          {t.pressSlash}
         </span>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { atom } from 'nanostores';
+import type { SupportedLanguage } from '../lib/i18n';
 
 export interface ActiveSectionState {
   bookId: number;
@@ -13,6 +14,29 @@ export type FontSizeOption = 'sm' | 'base' | 'lg' | 'xl';
 export const $isDrawerOpen = atom<boolean>(false);
 export const $activeSection = atom<ActiveSectionState | null>(null);
 export const $fontSize = atom<FontSizeOption>('base');
+export const $currentLang = atom<SupportedLanguage>('ar');
+export const $toastMessage = atom<string | null>(null);
+
+export function showToast(message: string, durationMs: number = 3000) {
+  $toastMessage.set(message);
+  setTimeout(() => {
+    if ($toastMessage.get() === message) {
+      $toastMessage.set(null);
+    }
+  }, durationMs);
+}
+
+/**
+ * Changes language and updates URL query param
+ */
+export function setLanguage(lang: SupportedLanguage) {
+  $currentLang.set(lang);
+  if (typeof window !== 'undefined') {
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', lang);
+    window.location.href = url.toString();
+  }
+}
 
 /**
  * Opens the Chapter Reader Drawer and binds browser history (pushState)
@@ -36,7 +60,7 @@ export function closeChapterDrawer() {
 
 // Global browser popstate & Escape key invariant
 if (typeof window !== 'undefined') {
-  window.addEventListener('popstate', (event) => {
+  window.addEventListener('popstate', () => {
     if ($isDrawerOpen.get()) {
       $isDrawerOpen.set(false);
     }
