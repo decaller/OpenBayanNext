@@ -21,8 +21,12 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
     <!-- Brand Logo & Title (Centering by default, sliding to start on scroll) -->
     <div id="navbar-brand-wrapper" class="flex items-center gap-3 transition-all duration-300 ease-out navbar-logo-centered z-10">
       <a href={`/?lang=${currentLang}`} class="flex items-center gap-3 group">
-        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary text-primary-content flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
-          <span class="font-serif text-xl sm:text-2xl font-bold">ب</span>
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary text-primary-content shadow-sm flex items-center justify-center p-1.5 group-hover:scale-105 transition-transform flex-shrink-0">
+          <img 
+            src="/logo-symbol-white.png" 
+            alt="OpenBayan Logo" 
+            class="w-full h-full object-contain" 
+          />
         </div>
         <div class="flex flex-col text-start">
           <span class="font-bold text-base sm:text-lg tracking-tight font-sans block leading-none text-base-content">{t.appName}</span>
@@ -30,6 +34,8 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
         </div>
       </a>
     </div>
+
+
 
     <!-- Mini Navbar Search Bar (Hidden by default, slides/fades in on the end side on scroll) -->
     <div id="navbar-search-wrapper" class="navbar-search-hidden flex items-center ms-auto transition-all duration-300 ease-out w-full max-w-xs sm:max-w-sm md:max-w-md ps-4">

@@ -1,12 +1,13 @@
 # OpenBayan (بيان) — Classical Arabic Semantic Search & Scholarly Corpus Engine
 
 <p align="center">
-  <img src="apps/web/public/favicon.svg" alt="OpenBayan Logo" width="80" height="80" />
+  <img src="logo.jpg" alt="OpenBayan Logo" width="640" style="border-radius: 16px; max-width: 100%; height: auto;" />
 </p>
 
 <p align="center">
   <strong>A high-throughput, low-latency Information Retrieval (IR) and thematic synthesis platform engineered specifically for classical Islamic scholarly corpora.</strong>
 </p>
+
 
 <p align="center">
   <a href="#-project-vision--philosophy">Vision</a> •

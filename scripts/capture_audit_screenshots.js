@@ -40,9 +40,9 @@ async function capture() {
 
     // 1. Capture All 8 Themes on Search Result Page
     for (const theme of THEMES) {
-      const url = `http://localhost:4321/search?q=%D8%B5%D8%AD%D9%8A%D8%AD+%D8%A7%D9%84%D8%A8%D8%AE%D8%A7%D8%B1%D9%8A`;
+      const url = `http://127.0.0.1:4321/search?q=%D8%B5%D8%AD%D9%8A%D8%AD+%D8%A7%D9%84%D8%A8%D8%AE%D8%A7%D8%B1%D9%8A`;
       try {
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
         await page.evaluate((th) => {
           document.documentElement.setAttribute('data-theme', th);
           localStorage.setItem('openbayan_theme', th);
@@ -59,8 +59,8 @@ async function capture() {
 
     // 2. Capture Empty State with Actionable Recovery
     try {
-      const emptyUrl = `http://localhost:4321/search?q=%D9%83%D9%84%D9%85%D8%A9_%D8%BA%D9%8A%D8%B1_%D9%85%D9%88%D8%AC%D9%88%D8%AF%D8%A9`;
-      await page.goto(emptyUrl, { waitUntil: 'networkidle', timeout: 15000 });
+      const emptyUrl = `http://127.0.0.1:4321/search?q=%D9%83%D9%84%D9%85%D8%A9_%D8%BA%D9%8A%D8%B1_%D9%85%D9%88%D8%AC%D9%88%D8%AF%D8%A9`;
+      await page.goto(emptyUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
       await page.waitForTimeout(400);
       const filename = `${vp.name}_empty_state.png`;
       await page.screenshot({ path: path.join(OUTPUT_DIR, filename), fullPage: false });
@@ -71,8 +71,8 @@ async function capture() {
 
     // 3. Capture Permalink Page in Retro Theme (WCAG Title Test)
     try {
-      const permalinkUrl = `http://localhost:4321/p/884`;
-      await page.goto(permalinkUrl, { waitUntil: 'networkidle', timeout: 15000 });
+      const permalinkUrl = `http://127.0.0.1:4321/p/884`;
+      await page.goto(permalinkUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
       await page.evaluate(() => {
         document.documentElement.setAttribute('data-theme', 'retro');
       });
@@ -86,7 +86,7 @@ async function capture() {
 
     // 4. Capture Homepage
     try {
-      await page.goto(`http://localhost:4321/`, { waitUntil: 'networkidle', timeout: 15000 });
+      await page.goto(`http://127.0.0.1:4321/`, { waitUntil: 'domcontentloaded', timeout: 15000 });
       await page.waitForTimeout(400);
       const filename = `${vp.name}_homepage.png`;
       await page.screenshot({ path: path.join(OUTPUT_DIR, filename), fullPage: false });
@@ -94,6 +94,8 @@ async function capture() {
     } catch (err) {
       console.error(`  ✗ Failed homepage on ${vp.name}:`, err.message);
     }
+
+
 
     await context.close();
   }
