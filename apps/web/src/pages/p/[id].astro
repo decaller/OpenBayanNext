@@ -1,0 +1,197 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { 
+  INTERNAL_API_URL, 
+  type ChunkDetailResponse, 
+  type SurroundingContextResponse 
+} from '../../lib/api';
+
+const { id } = Astro.params;
+const chunkId = parseInt(id || '0', 10);
+
+if (!chunkId || chunkId < 1) {
+  return Astro.redirect('/404');
+}
+
+let chunk: ChunkDetailResponse | null = null;
+let surrounding: SurroundingContextResponse | null = null;
+let error: string | null = null;
+
+try {
+  // Fetch Level-1 Detail and Level-2 Surrounding Context in parallel
+  const [detailRes, surroundingRes] = await Promise.all([
+    fetch(`${INTERNAL_API_URL}/chunks/${chunkId}`),
+    fetch(`${INTERNAL_API_URL}/chunks/${chunkId}/surrounding`),
+  ]);
+
+  if (detailRes.ok) {
+    chunk = await detailRes.json();
+  } else {
+    error = `لم يتم العثور على المقتطف رقم ${chunkId}`;
+  }
+
+  if (surroundingRes.ok) {
+    surrounding = await surroundingRes.json();
+  }
+} catch (err: any) {
+  error = `خطأ في الاتصال بالخادم الداخلي: ${err?.message || err}`;
+}
+
+if (!chunk && !error) {
+  return Astro.redirect('/404');
+}
+
+// Generate Schema.org JSON-LD metadata for search engine indexing
+const jsonLd = chunk ? {
+  "@context": "https://schema.org",
+  "@type": "ScholarlyArticle",
+  "headline": `${chunk.section_title} - ${chunk.book_name}`,
+  "author": {
+    "@type": "Person",
+    "name": chunk.author_name,
+    "description": `توفي سنة ${chunk.author_death_hijri} هـ`
+  },
+  "isPartOf": {
+    "@type": "Book",
+    "name": chunk.book_name,
+    "inLanguage": "ar"
+  },
+  "pageStart": chunk.volume_page,
+  "articleBody": chunk.raw_text,
+  "inLanguage": "ar"
+} : undefined;
+
+const pageTitle = chunk 
+  ? `${chunk.section_title} | ${chunk.book_name} (${chunk.volume_page})`
+  : 'بيان | قراءة مقتطف';
+---
+
+<BaseLayout 
+  title={pageTitle} 
+  description={chunk?.raw_text.slice(0, 160)}
+  jsonLd={jsonLd}
+>
+  {error ? (
+    <div class="alert alert-error my-12 max-w-2xl mx-auto shadow-sm font-sans">
+      <span>{error}</span>
+    </div>
+  ) : chunk && (
+    <div class="max-w-3xl mx-auto space-y-8 py-4">
+      <!-- Breadcrumb Navigation -->
+      <nav class="flex items-center gap-2 text-xs font-sans text-base-content/60 overflow-x-auto pb-2">
+        <a href="/" class="hover:text-emerald-700">الرئيسية</a>
+        <span>/</span>
+        <a href={`/search?q=${encodeURIComponent(chunk.book_name)}`} class="hover:text-emerald-700">{chunk.book_name}</a>
+        <span>/</span>
+        <span class="text-base-content/90 font-medium truncate">{chunk.section_title}</span>
+      </nav>
+
+      <!-- Main Scholarly Article Card (0-JS Pure Semantic HTML) -->
+      <article class="bg-base-100 border border-base-200/90 rounded-3xl p-6 sm:p-10 shadow-xs space-y-6">
+        <!-- Bibliographic Header -->
+        <header class="border-b border-base-200 pb-6">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <span class="badge badge-lg badge-neutral font-mono font-bold text-xs">
+              {chunk.volume_page}
+            </span>
+
+            <div class="flex items-center gap-2 font-sans text-xs text-base-content/60">
+              <span>التصنيف: <strong>{chunk.category_name}</strong></span>
+              <span>•</span>
+              <span>المؤلف: <strong>{chunk.author_name}</strong> (ت: {chunk.author_death_hijri} هـ)</span>
+            </div>
+          </div>
+
+          <h1 class="text-2xl sm:text-3xl font-bold font-sans text-emerald-950 dark:text-emerald-300 leading-snug mt-3">
+            {chunk.section_title}
+          </h1>
+          <p class="text-xs text-base-content/60 font-sans mt-1">
+            {chunk.breadcrumb}
+          </p>
+        </header>
+
+        <!-- Classical Text Body (Amiri Font, Line Height 2.3) -->
+        <div class="arabic-matn text-lg sm:text-xl text-base-content/90 leading-loose py-2">
+          {chunk.raw_text}
+        </div>
+
+        <!-- Footnotes Section if present -->
+        {chunk.footnotes && (
+          <footer class="mt-8 pt-6 border-t border-dashed border-base-300 font-sans text-xs sm:text-sm text-base-content/70 space-y-2 bg-base-200/20 p-4 rounded-xl">
+            <h4 class="font-bold text-base-content/90 text-xs">الحواشي والهوامش:</h4>
+            <p class="leading-relaxed whitespace-pre-line">{chunk.footnotes}</p>
+          </footer>
+        )}
+
+        <!-- Bottom Action Bar (Opens Chapter Drawer) -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-base-200 font-sans text-xs">
+          <span class="text-base-content/50">رابط معتمد للتناقل والاقتباس الأكاديمي</span>
+
+          <button 
+            type="button"
+            class="btn btn-sm btn-outline btn-success hover:!bg-emerald-800 hover:!text-white gap-2 font-bold"
+            data-open-drawer
+            data-book-id={chunk.book_id}
+            data-section-id={chunk.section_id}
+            data-section-title={chunk.section_title}
+            data-breadcrumb={chunk.breadcrumb}
+            data-chunk-id={chunk.chunk_id}
+          >
+            <span>مطالعة الباب كاملاً في الدرج الجانبي</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
+        </div>
+      </article>
+
+      <!-- Level-2 Surrounding Context (Pre-rendered N - 1 and N + 1 Sibling Passages) -->
+      {surrounding && surrounding.items.length > 1 && (
+        <section class="space-y-4 pt-6">
+          <div class="flex items-center justify-between text-xs font-sans text-base-content/60 px-2">
+            <span class="font-bold text-sm text-base-content/80">المحيط والسياق المتصل (الصفحات السابقة واللاحقة):</span>
+            <span>{surrounding.items.length} مواضع متتابعة</span>
+          </div>
+
+          <div class="space-y-3">
+            {surrounding.items.map((item) => {
+              const isCurrent = item.chunk_id === chunkId;
+              return (
+                <div 
+                  class={`p-5 rounded-2xl border transition-all ${
+                    isCurrent 
+                      ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-700/40 shadow-xs' 
+                      : 'bg-base-100/70 border-base-200/80'
+                  }`}
+                >
+                  <div class="flex items-center justify-between text-xs font-mono text-base-content/50 mb-2 pb-1 border-b border-base-200/40">
+                    <span class="font-bold text-emerald-800 dark:text-emerald-400">
+                      {item.volume_page} {isCurrent && '(الموضع الحالي)'}
+                    </span>
+                    {!item.is_same_section && (
+                      <span class="badge badge-xs badge-warning text-[10px]">
+                        فصل مختلف ({item.section_title})
+                      </span>
+                    )}
+                  </div>
+
+                  <div class="arabic-matn text-base sm:text-lg text-base-content/80 leading-relaxed">
+                    {item.raw_text.slice(0, 250)}...
+                  </div>
+
+                  {!isCurrent && (
+                    <div class="mt-2 text-left">
+                      <a href={`/p/${item.chunk_id}`} class="btn btn-ghost btn-xs text-emerald-800 text-[11px] font-sans">
+                        انتقل إلى هذا الموضع ←
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+    </div>
+  )}
+</BaseLayout>

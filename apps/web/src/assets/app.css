@@ -1,2 +1,109 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+@import "@fontsource/amiri/400.css";
+@import "@fontsource/amiri/700.css";
+@import "@fontsource/ibm-plex-sans-arabic/400.css";
+@import "@fontsource/ibm-plex-sans-arabic/500.css";
+@import "@fontsource/ibm-plex-sans-arabic/600.css";
+@import "@fontsource/ibm-plex-sans-arabic/700.css";
+
+:root {
+  --font-amiri: 'Amiri', serif;
+  --font-sans: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --bg-paper: #fcfbf7;
+  --bg-card: #ffffff;
+  --border-subtle: #e8e4d9;
+}
+
+[data-theme="dark"],
+.dark {
+  --bg-paper: #131618;
+  --bg-card: #1c2024;
+  --border-subtle: #2d3339;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-paper);
+  color: #2b2b2b;
+  min-height: 100vh;
+  direction: rtl;
+  text-align: right;
+}
+
+[data-theme="dark"] body {
+  color: #e2e8f0;
+}
+
+/* Classical Scholarly Arabic Matn Styling */
+.arabic-matn {
+  font-family: var(--font-amiri);
+  line-height: 2.3;
+  letter-spacing: 0.01em;
+  text-align: justify;
+  text-justify: inter-word;
+  font-feature-settings: "cv01", "cv02", "ss01";
+}
+
+.arabic-heading {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Visual Page Divider for Merged Sibling Passages */
+.page-divider {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(to left, transparent, #c5bc9f, transparent);
+  margin: 1.5rem 0;
+  position: relative;
+}
+
+.page-divider::after {
+  content: "§";
+  position: absolute;
+  top: -0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-card);
+  padding: 0 0.5rem;
+  color: #8c8266;
+  font-size: 0.85rem;
+  font-family: var(--font-amiri);
+}
+
+/* Footnotes Styling */
+.footnote-ref {
+  font-size: 0.75rem;
+  vertical-align: super;
+  color: #0284c7;
+  text-decoration: none;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  margin: 0 0.15rem;
+}
+
+.footnote-ref:hover {
+  text-decoration: underline;
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 130, 102, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 130, 102, 0.6);
+}

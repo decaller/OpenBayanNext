@@ -1,0 +1,75 @@
+---
+import Header from '../components/astro/Header.astro';
+import Footer from '../components/astro/Footer.astro';
+import { CitationDrawer } from '../components/islands/CitationDrawer';
+import '../assets/app.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  jsonLd?: Record<string, any>;
+}
+
+const {
+  title = "بيان | محرك بحث وقراءة للتراث الإسلامي",
+  description = "محرك بحث وقراءة فائق السرعة لمتون وشروح الحديث والفقه والعقيدة والتفسير بتقنيات البحث الهجين FTS5 و Dense Vectors.",
+  jsonLd,
+} = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="emerald">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Open Graph / SEO -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:locale" content="ar_AR" />
+
+    <!-- Schema.org JSON-LD if present (for 0-JS permalinks) -->
+    {jsonLd && (
+      <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    )}
+  </head>
+  <body class="min-h-screen flex flex-col antialiased selection:bg-emerald-200 selection:text-emerald-900">
+    <Header />
+    
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8">
+      <slot />
+    </main>
+
+    <Footer />
+
+    <!-- Global Citation Drawer Island (Hydrated on idle) -->
+    <CitationDrawer client:idle />
+
+    <!-- Global Static HTML to Nanostores Event Delegator (0 KB JS Card Bridge) -->
+    <script>
+      import { openChapterDrawer } from '../stores/workspace';
+
+      document.addEventListener('click', (e) => {
+        const target = (e.target as HTMLElement).closest('[data-open-drawer]');
+        if (!target) return;
+
+        const dataset = (target as HTMLElement).dataset;
+        if (dataset.bookId && dataset.sectionId && dataset.sectionTitle) {
+          openChapterDrawer({
+            bookId: Number(dataset.bookId),
+            sectionId: dataset.sectionId,
+            sectionTitle: dataset.sectionTitle,
+            breadcrumb: dataset.breadcrumb || dataset.sectionTitle,
+            focusChunkId: dataset.chunkId ? Number(dataset.chunkId) : undefined,
+          });
+        }
+      });
+    </script>
+  </body>
+</html>

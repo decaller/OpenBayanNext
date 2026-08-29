@@ -12,12 +12,27 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/node": "^11.1.4",
+    "@astrojs/react": "^6.0.4",
+    "@fontsource/amiri": "^5.3.0",
+    "@fontsource/ibm-plex-sans-arabic": "^5.3.0",
+    "@nanostores/react": "^1.1.0",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.2.9",
+    "clsx": "^2.1.1",
     "daisyui": "^5.7.22",
+    "lucide-react": "^1.34.0",
+    "nanostores": "^1.5.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3"
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5"
   }
 }

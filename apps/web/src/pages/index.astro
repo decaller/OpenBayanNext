@@ -1,9 +1,71 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SearchBar } from '../components/islands/SearchBar';
 ---
 
-<Layout>
-	<h1>Astro + Tailwind + DaisyUI</h1>
-	<button class="btn btn-primary">Button</button>
-</Layout>
+<BaseLayout 
+  title="بيان | محرك بحث وقراءة للتراث الإسلامي"
+  description="ابحث في أمهات كتب الحديث والفقه والتفسير والعقيدة بدقة لغوية متقدمة وسرعة فائقة."
+>
+  <div class="flex flex-col items-center justify-center min-h-[70vh] text-center max-w-3xl mx-auto py-12">
+    <!-- Hero Emblem -->
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-800/10 text-emerald-800 dark:text-emerald-300 text-xs font-semibold font-sans mb-6">
+      <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+      <span>البحث الهجين: FTS5 المعجمي + E5 الدلالي</span>
+    </div>
 
+    <!-- Title & Subtitle -->
+    <h1 class="text-4xl sm:text-6xl font-bold font-sans tracking-tight text-emerald-950 dark:text-emerald-200 mb-4 leading-tight">
+      بيان للبحث المعرفي
+    </h1>
+    <p class="text-base sm:text-lg text-base-content/70 font-sans mb-10 max-w-xl mx-auto leading-relaxed">
+      محرك بحث وقراءة ذكي وموثق لأمهات كتب التراث الإسلامي، يستخرج الجذور ويصل السلسلة بالنص الكامل.
+    </p>
+
+    <!-- Large Search Bar Island -->
+    <div class="w-full mb-8">
+      <SearchBar client:load size="large" autoFocus={true} />
+    </div>
+
+    <!-- Quick Exploration Chips -->
+    <div class="flex flex-wrap items-center justify-center gap-2 text-xs font-sans text-base-content/70 mt-2">
+      <span class="font-bold text-base-content/50">أمثلة شائعة:</span>
+      <a href="/search?q=إنما+الأعمال+بالنيات" class="badge badge-lg badge-outline hover:badge-primary transition-colors py-3">
+        إنما الأعمال بالنيات
+      </a>
+      <a href="/search?q=شروط+بيع+السلم" class="badge badge-lg badge-outline hover:badge-primary transition-colors py-3">
+        شروط بيع السلم
+      </a>
+      <a href="/search?q=صلاة+الوتر+في+السفر" class="badge badge-lg badge-outline hover:badge-primary transition-colors py-3">
+        صلاة الوتر في السفر
+      </a>
+      <a href="/search?q=طهارة+الماء+الراكد" class="badge badge-lg badge-outline hover:badge-primary transition-colors py-3">
+        طهارة الماء الراكد
+      </a>
+      <a href="/search?q=ثبوت+الشفعة+للشريك" class="badge badge-lg badge-outline hover:badge-primary transition-colors py-3">
+        ثبوت الشفعة للشريك
+      </a>
+    </div>
+
+    <!-- Feature Grid Highlights -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mt-16 pt-12 border-t border-base-200/70 text-right">
+      <div class="p-4 rounded-2xl bg-base-100/70 border border-base-200">
+        <div class="w-8 h-8 rounded-lg bg-emerald-800/10 text-emerald-800 flex items-center justify-center font-bold mb-2">١</div>
+        <h4 class="font-bold text-sm text-base-content mb-1">دقة لغوية وجذرية</h4>
+        <p class="text-xs text-base-content/60 leading-relaxed">تحليل صرفي وجذري دقيق عبر PyArabic و Tashaphyne يربط المشتقات بأصولها.</p>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-base-100/70 border border-base-200">
+        <div class="w-8 h-8 rounded-lg bg-emerald-800/10 text-emerald-800 flex items-center justify-center font-bold mb-2">٢</div>
+        <h4 class="font-bold text-sm text-base-content mb-1">دمج الصفحات المتتالية</h4>
+        <p class="text-xs text-base-content/60 leading-relaxed">دمج آلي للصفحات المتصلة من الكتاب نفسه في بطاقة قراءة موحدة دون تقطيع للمعنى.</p>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-base-100/70 border border-base-200">
+        <div class="w-8 h-8 rounded-lg bg-emerald-800/10 text-emerald-800 flex items-center justify-center font-bold mb-2">٣</div>
+        <h4 class="font-bold text-sm text-base-content mb-1">مطالعة الباب بلمسة</h4>
+        <p class="text-xs text-base-content/60 leading-relaxed">درج قراءة جانبي يتيح تصفح الفصل كاملاً من أوله لآخره مع العزو الدقيق ورقم الصفحة.</p>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

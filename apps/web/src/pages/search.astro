@@ -1,0 +1,127 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PassageCard from '../components/astro/PassageCard.astro';
+import { SearchBar } from '../components/islands/SearchBar';
+import { INTERNAL_API_URL, type SearchResponse } from '../lib/api';
+
+// Parse query params from URL
+const query = Astro.url.searchParams.get('q') || '';
+const page = parseInt(Astro.url.searchParams.get('page') || '1', 10);
+const limit = 15;
+const mode = (Astro.url.searchParams.get('mode') || 'hybrid') as 'hybrid' | 'fts' | 'vector';
+
+let searchData: SearchResponse | null = null;
+let error: string | null = null;
+
+if (query.trim()) {
+  try {
+    const fetchUrl = `${INTERNAL_API_URL}/search?q=${encodeURIComponent(query.trim())}&page=${page}&limit=${limit}&mode=${mode}&merge_siblings=true`;
+    const res = await fetch(fetchUrl);
+    if (res.ok) {
+      searchData = await res.json();
+    } else {
+      error = `تعذر استرجاع النتائج (رمز الخطأ: ${res.status})`;
+    }
+  } catch (err: any) {
+    error = `خطأ في الاتصال بالخادم الداخلي: ${err?.message || err}`;
+  }
+}
+
+const totalPages = searchData ? Math.ceil(searchData.total_hits / limit) : 0;
+const pageTitle = query ? `نتائج البحث عن "${query}" | بيان` : 'البحث في المكتبة | بيان';
+---
+
+<BaseLayout title={pageTitle}>
+  <div class="max-w-4xl mx-auto space-y-6">
+    <!-- Top Search Header -->
+    <div class="py-2">
+      <SearchBar 
+        client:load 
+        initialQuery={query} 
+        initialMode={mode}
+        size="normal"
+      />
+    </div>
+
+    <!-- Error Banner if API failed -->
+    {error && (
+      <div class="alert alert-error shadow-sm font-sans my-4">
+        <span>{error}</span>
+      </div>
+    )}
+
+    <!-- Search Results Header & Stats -->
+    {searchData && (
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-sans text-base-content/70 pb-3 border-b border-base-200">
+        <div>
+          <span>نتائج البحث عن: <strong class="text-base-content text-sm">"{query}"</strong></span>
+          <span class="mr-2">({searchData.total_hits} نتيجة في {searchData.took_ms} ملي ثانية)</span>
+        </div>
+
+        <div class="text-[11px] font-mono opacity-60">
+          الصفحة {page} من {totalPages || 1}
+        </div>
+      </div>
+    )}
+
+    <!-- Results Stream -->
+    {searchData && searchData.results.length > 0 && (
+      <div class="space-y-4">
+        {searchData.results.map((item, idx) => (
+          <PassageCard 
+            chunk={item} 
+            rankIndex={(page - 1) * limit + idx + 1} 
+          />
+        ))}
+      </div>
+    )}
+
+    <!-- Empty State -->
+    {searchData && searchData.results.length === 0 && (
+      <div class="text-center py-16 bg-base-100/60 rounded-3xl border border-dashed border-base-300 p-8 my-6">
+        <div class="w-12 h-12 rounded-full bg-base-200 text-base-content/40 flex items-center justify-center mx-auto mb-3 text-xl">
+          🔍
+        </div>
+        <h3 class="text-base font-bold text-base-content mb-1 font-sans">لم نعثر على نتائج مطابقة</h3>
+        <p class="text-xs text-base-content/60 font-sans max-w-sm mx-auto">
+          جرب استخدام كلمات بحث بديلة، أو أصول الكلمات، أو غير نمط البحث إلى "دلالي معنوي".
+        </p>
+      </div>
+    )}
+
+    <!-- SSR Pagination Controls -->
+    {totalPages > 1 && (
+      <div class="flex items-center justify-center gap-2 pt-8 pb-12 font-sans">
+        {page > 1 ? (
+          <a
+            href={`/search?q=${encodeURIComponent(query)}&mode=${mode}&page=${page - 1}`}
+            class="btn btn-sm btn-outline btn-neutral"
+          >
+            ← الصفحة السابقة
+          </a>
+        ) : (
+          <button disabled class="btn btn-sm btn-disabled opacity-40">
+            ← الصفحة السابقة
+          </button>
+        )}
+
+        <span class="text-xs font-bold px-3">
+          {page} / {totalPages}
+        </span>
+
+        {page < totalPages ? (
+          <a
+            href={`/search?q=${encodeURIComponent(query)}&mode=${mode}&page=${page + 1}`}
+            class="btn btn-sm btn-outline btn-neutral"
+          >
+            الصفحة التالية →
+          </a>
+        ) : (
+          <button disabled class="btn btn-sm btn-disabled opacity-40">
+            الصفحة التالية →
+          </button>
+        )}
+      </div>
+    )}
+  </div>
+</BaseLayout>
