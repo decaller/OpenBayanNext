@@ -11,6 +11,7 @@ export interface ActiveSectionState {
 
 export type FontSizeOption = 'sm' | 'base' | 'lg' | 'xl';
 export type ContextDepth = 1 | 2;
+export type FontFamilyOption = 'amiri' | 'readex' | 'ibm-plex' | 'noto' | 'tajawal' | 'cairo';
 
 // Load persisted settings from localStorage helper
 function getStored<T>(key: string, defaultValue: T): T {
@@ -44,6 +45,8 @@ export const $toastMessage = atom<string | null>(null);
 // Search Results Reading & Display Controls (persisted in localStorage)
 export const $showHighlights = atom<boolean>(getStored('openbayan_pref_highlights', true));
 export const $chunkFontSize = atom<FontSizeOption>(getStored('openbayan_pref_fontsize', 'base'));
+export const $isFontBold = atom<boolean>(getStored('openbayan_pref_fontbold', false));
+export const $fontFamily = atom<FontFamilyOption>(getStored('openbayan_pref_fontfamily', 'amiri'));
 export const $isCompact = atom<boolean>(getStored('openbayan_pref_compact', false));
 export const $contextDepth = atom<ContextDepth>(getStored('openbayan_pref_depth', 1));
 
@@ -78,6 +81,19 @@ export function setChunkFontSize(size: FontSizeOption) {
   updateDisplayClasses();
 }
 
+export function toggleFontBold() {
+  const next = !$isFontBold.get();
+  $isFontBold.set(next);
+  setStored('openbayan_pref_fontbold', next);
+  updateDisplayClasses();
+}
+
+export function setFontFamily(family: FontFamilyOption) {
+  $fontFamily.set(family);
+  setStored('openbayan_pref_fontfamily', family);
+  updateDisplayClasses();
+}
+
 export function toggleCompactView() {
   const next = !$isCompact.get();
   $isCompact.set(next);
@@ -107,14 +123,32 @@ export function updateDisplayClasses() {
   container.classList.remove('chunk-font-sm', 'chunk-font-base', 'chunk-font-lg', 'chunk-font-xl');
   container.classList.add(`chunk-font-${$chunkFontSize.get()}`);
 
-  // 3. Compact Density
+  // 3. Arabic Font-Family
+  container.classList.remove(
+    'font-family-amiri',
+    'font-family-readex',
+    'font-family-ibm-plex',
+    'font-family-noto',
+    'font-family-tajawal',
+    'font-family-cairo'
+  );
+  container.classList.add(`font-family-${$fontFamily.get()}`);
+
+  // 4. Arabic Font Weight Bold
+  if ($isFontBold.get()) {
+    container.classList.add('matn-bold');
+  } else {
+    container.classList.remove('matn-bold');
+  }
+
+  // 5. Compact Density
   if ($isCompact.get()) {
     container.classList.add('compact-results');
   } else {
     container.classList.remove('compact-results');
   }
 
-  // 4. Context Depth Level (1: Snippet, 2: Context ±1)
+  // 6. Context Depth Level (1: Snippet, 2: Context ±1)
   container.classList.remove('depth-level-1', 'depth-level-2');
   container.classList.add(`depth-level-${$contextDepth.get()}`);
 }

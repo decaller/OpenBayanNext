@@ -3,12 +3,24 @@
   themes: all;
 }
 
+/* Classical & Modern Arabic Web Fonts */
 @import "@fontsource/amiri/400.css";
 @import "@fontsource/amiri/700.css";
 @import "@fontsource/ibm-plex-sans-arabic/400.css";
 @import "@fontsource/ibm-plex-sans-arabic/500.css";
 @import "@fontsource/ibm-plex-sans-arabic/600.css";
 @import "@fontsource/ibm-plex-sans-arabic/700.css";
+@import "@fontsource/readex-pro/400.css";
+@import "@fontsource/readex-pro/600.css";
+@import "@fontsource/readex-pro/700.css";
+@import "@fontsource/noto-sans-arabic/400.css";
+@import "@fontsource/noto-sans-arabic/600.css";
+@import "@fontsource/noto-sans-arabic/700.css";
+@import "@fontsource/tajawal/400.css";
+@import "@fontsource/tajawal/700.css";
+@import "@fontsource/cairo/400.css";
+@import "@fontsource/cairo/600.css";
+@import "@fontsource/cairo/700.css";
 
 :root {
   --font-amiri: 'Amiri', serif;
@@ -27,7 +39,7 @@ body {
   color: var(--color-base-content);
 }
 
-/* Classical Scholarly Arabic Matn Styling */
+/* Classical Scholarly Arabic Matn Styling (Default: Amiri) */
 .arabic-matn {
   font-family: var(--font-amiri);
   line-height: 2.3;
@@ -52,7 +64,41 @@ body {
   z-index: 20;
 }
 
+/* Dynamic Arabic Font-Family Options */
+.font-family-amiri .arabic-matn {
+  font-family: 'Amiri', serif !important;
+}
+
+.font-family-readex .arabic-matn {
+  font-family: 'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  line-height: 2.1 !important;
+}
+
+.font-family-ibm-plex .arabic-matn {
+  font-family: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  line-height: 2.1 !important;
+}
+
+.font-family-noto .arabic-matn {
+  font-family: 'Noto Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  line-height: 2.1 !important;
+}
+
+.font-family-tajawal .arabic-matn {
+  font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  line-height: 2.1 !important;
+}
+
+.font-family-cairo .arabic-matn {
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  line-height: 2.1 !important;
+}
+
 /* Reading & Display Controls Classes */
+.matn-bold .arabic-matn {
+  font-weight: 700 !important;
+}
+
 .hide-highlights mark {
   background-color: transparent !important;
   color: inherit !important;

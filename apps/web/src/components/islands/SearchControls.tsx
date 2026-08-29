@@ -3,15 +3,20 @@ import { useStore } from '@nanostores/react';
 import { 
   $showHighlights, 
   $chunkFontSize, 
+  $isFontBold,
+  $fontFamily,
   $isCompact,
   $contextDepth,
   $currentLang,
   setLanguage,
   toggleHighlights, 
   setChunkFontSize, 
+  toggleFontBold,
+  setFontFamily,
   toggleCompactView,
   setContextDepth,
   type FontSizeOption,
+  type FontFamilyOption,
   type ContextDepth
 } from '../../stores/workspace';
 import { translations, type SupportedLanguage } from '../../lib/i18n';
@@ -37,9 +42,20 @@ const LANGUAGES: { code: SupportedLanguage; label: string; flag: string }[] = [
   { code: 'id', label: 'Indonesia', flag: '🇮🇩' },
 ];
 
+const FONTS: { id: FontFamilyOption; name: string; labelAr: string; type: string }[] = [
+  { id: 'amiri', name: 'Amiri', labelAr: 'أميري', type: 'نسخ تراثي' },
+  { id: 'readex', name: 'Readex', labelAr: 'ريدكس', type: 'حديث واضح' },
+  { id: 'ibm-plex', name: 'IBM Plex', labelAr: 'بلكس', type: 'متوازن' },
+  { id: 'noto', name: 'Noto', labelAr: 'نوتو', type: 'قياسي' },
+  { id: 'tajawal', name: 'Tajawal', labelAr: 'تجوال', type: 'عصري' },
+  { id: 'cairo', name: 'Cairo', labelAr: 'كايرو', type: 'هندسي' },
+];
+
 export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLang }) => {
   const showHighlights = useStore($showHighlights);
   const fontSize = useStore($chunkFontSize);
+  const isFontBold = useStore($isFontBold);
+  const currentFontFamily = useStore($fontFamily);
   const isCompact = useStore($isCompact);
   const contextDepth = useStore($contextDepth);
   const storeLang = useStore($currentLang);
@@ -188,7 +204,75 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
             </div>
           </div>
 
-          {/* 3. Context Depth Switcher (2 Levels: 1: Snippet, 2: Context ±1) */}
+          {/* 3. Arabic Typeface / Font Family Selector */}
+          <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
+            <div className="flex items-center justify-between">
+              <span className="text-base-content/70 font-semibold flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+                <span>{t.fontFamilyLabel}</span>
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-1">
+              {FONTS.map((f) => {
+                const isSelected = currentFontFamily === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFontFamily(f.id)}
+                    className={`btn btn-xs rounded-lg transition-all flex flex-col h-auto py-1 px-1 gap-0.5 border text-start ${
+                      isSelected 
+                        ? 'btn-primary font-bold shadow-xs' 
+                        : 'bg-base-200/80 hover:bg-base-200 text-base-content/80 border-base-200'
+                    }`}
+                  >
+                    <span className="font-bold text-[11px] leading-tight truncate w-full">{f.name}</span>
+                    <span className="text-[9px] opacity-70 truncate w-full">{f.type}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. Font Size & Arabic Bold Toggle */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50 gap-2">
+            <div>
+              <span className="text-base-content/70 font-semibold block text-[11px] mb-1">{t.fontSizeLabel}</span>
+              <div className="join bg-base-200/80 rounded-lg p-0.5">
+                {fontOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setChunkFontSize(opt.id)}
+                    className={`join-item btn btn-xs ${fontSize === opt.id ? 'btn-active btn-primary font-bold' : 'btn-ghost'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-base-content/70 font-semibold block text-[11px] mb-1">{t.fontBoldLabel}</span>
+              <button
+                type="button"
+                onClick={toggleFontBold}
+                className={`btn btn-xs rounded-lg transition-colors gap-1 ${
+                  isFontBold 
+                    ? 'btn-primary font-bold shadow-xs' 
+                    : 'btn-ghost border border-base-300'
+                }`}
+              >
+                <span className="font-bold text-xs">B</span>
+                <span>{isFontBold ? t.toggleOn : t.toggleOff}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 5. Context Depth Switcher (2 Levels: 1: Snippet, 2: Context ±1) */}
           <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
             <div className="flex items-center justify-between">
               <span className="text-base-content/70 font-semibold">{t.depthLevelLabel}</span>
@@ -214,63 +298,48 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
             </div>
           </div>
 
-          {/* 4. Font Size Control */}
-          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50">
-            <span className="text-base-content/70 font-semibold">{t.fontSizeLabel}</span>
-            <div className="join bg-base-200/80 rounded-lg p-0.5">
-              {fontOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setChunkFontSize(opt.id)}
-                  className={`join-item btn btn-xs ${fontSize === opt.id ? 'btn-active btn-primary font-bold' : 'btn-ghost'}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          {/* 6. Highlights Toggle & Card Density Toggle */}
+          <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-base-200/50">
+            <div className="space-y-1">
+              <span className="text-base-content/70 font-semibold block text-[11px]">{t.highlightToggleLabel}</span>
+              <button
+                type="button"
+                onClick={toggleHighlights}
+                className={`btn btn-xs rounded-lg transition-colors w-full gap-1 ${
+                  showHighlights 
+                    ? 'btn-success bg-emerald-700 text-white border-0 hover:bg-emerald-800' 
+                    : 'btn-outline btn-neutral opacity-60'
+                }`}
+              >
+                {showHighlights ? (
+                  <>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{t.toggleOn}</span>
+                  </>
+                ) : (
+                  <span>{t.toggleOff}</span>
+                )}
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-base-content/70 font-semibold block text-[11px]">{t.densityLabel}</span>
+              <button
+                type="button"
+                onClick={toggleCompactView}
+                className={`btn btn-xs rounded-lg transition-colors w-full ${
+                  isCompact 
+                    ? 'btn-active bg-stone-800 text-white font-bold' 
+                    : 'btn-ghost border border-base-300'
+                }`}
+              >
+                {isCompact ? t.densityCompact : t.densityNormal}
+              </button>
             </div>
           </div>
 
-          {/* 5. Highlights Toggle */}
-          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50">
-            <span className="text-base-content/70 font-semibold">{t.highlightToggleLabel}</span>
-            <button
-              type="button"
-              onClick={toggleHighlights}
-              className={`btn btn-xs rounded-lg transition-colors gap-1 ${
-                showHighlights 
-                  ? 'btn-success bg-emerald-700 text-white border-0 hover:bg-emerald-800' 
-                  : 'btn-outline btn-neutral opacity-60'
-              }`}
-            >
-              {showHighlights ? (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>{t.toggleOn}</span>
-                </>
-              ) : (
-                <span>{t.toggleOff}</span>
-              )}
-            </button>
-          </div>
-
-          {/* 6. Card Density Toggle */}
-          <div className="flex items-center justify-between pt-1.5 border-t border-base-200/50">
-            <span className="text-base-content/70 font-semibold">{t.densityLabel}</span>
-            <button
-              type="button"
-              onClick={toggleCompactView}
-              className={`btn btn-xs rounded-lg transition-colors ${
-                isCompact 
-                  ? 'btn-active bg-stone-800 text-white font-bold' 
-                  : 'btn-ghost border border-base-300'
-              }`}
-            >
-              {isCompact ? t.densityCompact : t.densityNormal}
-            </button>
-          </div>
         </div>
       )}
     </div>
