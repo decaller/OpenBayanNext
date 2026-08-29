@@ -5,6 +5,8 @@ class SearchResultItem(BaseModel):
     chunk_id: int
     book_id: int
     book_name: str
+    author_name: Optional[str] = None
+    author_death_hijri: Optional[int] = None
     volume_page: str
     chunk_order: int
     section_id: str
@@ -19,6 +21,10 @@ class SearchResultItem(BaseModel):
     is_merged: bool = False
     merged_chunk_ids: List[int] = Field(default_factory=list)
     merged_page_range: Optional[str] = None
+    preceding_chunk_id: Optional[int] = None
+    preceding_text: Optional[str] = None
+    succeeding_chunk_id: Optional[int] = None
+    succeeding_text: Optional[str] = None
 
 class SearchResponse(BaseModel):
     query: str

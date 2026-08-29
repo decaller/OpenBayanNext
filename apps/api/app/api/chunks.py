@@ -1,7 +1,12 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 from app.core.database import db
-from app.schemas.search import ChunkDetailResponse, SurroundingContextResponse, SurroundingContextItem
+from app.schemas.search import (
+    ChunkDetailResponse, 
+    SurroundingContextResponse, 
+    SurroundingContextItem,
+    ChapterChunkItem
+)
 
 router = APIRouter(prefix="/chunks", tags=["Chunks & Context"])
 
@@ -104,3 +109,59 @@ async def get_surrounding_context(chunk_id: int = Path(..., ge=1, description="U
         section_title=t_sec_title,
         items=items
     )
+
+@router.get("/{chunk_id}/expand", response_model=List[ChapterChunkItem])
+async def expand_chunk_context(
+    chunk_id: int = Path(..., ge=1, description="Reference chunk ID"),
+    direction: str = Query(..., pattern="^(before|after)$", description="'before' to fetch earlier pages, 'after' for subsequent"),
+    limit: int = Query(5, ge=1, le=20, description="Number of adjacent chunks to fetch")
+):
+    """
+    Fetches contiguous preceding or succeeding chunks in the same book.
+    Used by the Reader Drawer to dynamically expand context backwards or forwards.
+    """
+    client = db.client
+    
+    # 1. Fetch reference chunk order and book_id
+    ref_res = await client.execute("SELECT book_id, chunk_order FROM prepared_chunks WHERE chunk_id = ?", [chunk_id])
+    if not ref_res.rows:
+        raise HTTPException(status_code=404, detail=f"Reference chunk {chunk_id} not found.")
+
+    book_id = ref_res.rows[0][0]
+    chunk_order = ref_res.rows[0][1]
+
+    if direction == "before":
+        sql = """
+        SELECT chunk_id, page_id, volume_page, chunk_order, raw_text, footnotes, is_section_start
+        FROM prepared_chunks
+        WHERE book_id = ? AND chunk_order < ?
+        ORDER BY chunk_order DESC
+        LIMIT ?
+        """
+        res = await client.execute(sql, [book_id, chunk_order, limit])
+        # Reverse to maintain chronological reading order
+        rows = list(reversed(res.rows))
+    else:
+        sql = """
+        SELECT chunk_id, page_id, volume_page, chunk_order, raw_text, footnotes, is_section_start
+        FROM prepared_chunks
+        WHERE book_id = ? AND chunk_order > ?
+        ORDER BY chunk_order ASC
+        LIMIT ?
+        """
+        res = await client.execute(sql, [book_id, chunk_order, limit])
+        rows = res.rows
+
+    chunks: List[ChapterChunkItem] = []
+    for c in rows:
+        chunks.append(ChapterChunkItem(
+            chunk_id=c[0],
+            page_id=c[1],
+            volume_page=c[2],
+            chunk_order=c[3],
+            raw_text=c[4],
+            footnotes=c[5],
+            is_section_start=bool(c[6])
+        ))
+
+    return chunks

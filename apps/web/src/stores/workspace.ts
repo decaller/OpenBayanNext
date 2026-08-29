@@ -10,12 +10,19 @@ export interface ActiveSectionState {
 }
 
 export type FontSizeOption = 'sm' | 'base' | 'lg' | 'xl';
+export type ContextDepth = 1 | 2;
 
 export const $isDrawerOpen = atom<boolean>(false);
 export const $activeSection = atom<ActiveSectionState | null>(null);
 export const $fontSize = atom<FontSizeOption>('base');
 export const $currentLang = atom<SupportedLanguage>('ar');
 export const $toastMessage = atom<string | null>(null);
+
+// Search Results Reading & Display Controls
+export const $showHighlights = atom<boolean>(true);
+export const $chunkFontSize = atom<FontSizeOption>('base');
+export const $isCompact = atom<boolean>(false);
+export const $contextDepth = atom<ContextDepth>(1);
 
 export function showToast(message: string, durationMs: number = 3000) {
   $toastMessage.set(message);
@@ -26,9 +33,6 @@ export function showToast(message: string, durationMs: number = 3000) {
   }, durationMs);
 }
 
-/**
- * Changes language and updates URL query param
- */
 export function setLanguage(lang: SupportedLanguage) {
   $currentLang.set(lang);
   if (typeof window !== 'undefined') {
@@ -38,10 +42,56 @@ export function setLanguage(lang: SupportedLanguage) {
   }
 }
 
-/**
- * Opens the Chapter Reader Drawer and binds browser history (pushState)
- * so that the user's Back button closes the drawer instead of navigating away.
- */
+export function toggleHighlights() {
+  const current = $showHighlights.get();
+  $showHighlights.set(!current);
+  updateDisplayClasses();
+}
+
+export function setChunkFontSize(size: FontSizeOption) {
+  $chunkFontSize.set(size);
+  updateDisplayClasses();
+}
+
+export function toggleCompactView() {
+  const current = $isCompact.get();
+  $isCompact.set(!current);
+  updateDisplayClasses();
+}
+
+export function setContextDepth(depth: ContextDepth) {
+  $contextDepth.set(depth);
+  updateDisplayClasses();
+}
+
+function updateDisplayClasses() {
+  if (typeof document === 'undefined') return;
+  const container = document.getElementById('search-results-container');
+  if (!container) return;
+
+  // 1. Highlights
+  if ($showHighlights.get()) {
+    container.classList.remove('hide-highlights');
+  } else {
+    container.classList.add('hide-highlights');
+  }
+
+  // 2. Font Size
+  container.classList.remove('chunk-font-sm', 'chunk-font-base', 'chunk-font-lg', 'chunk-font-xl');
+  container.classList.add(`chunk-font-${$chunkFontSize.get()}`);
+
+  // 3. Compact Density
+  if ($isCompact.get()) {
+    container.classList.add('compact-results');
+  } else {
+    container.classList.remove('compact-results');
+  }
+
+  // 4. Context Depth Level (1: Snippet, 2: Context ±1)
+  container.classList.remove('depth-level-1', 'depth-level-2');
+  container.classList.add(`depth-level-${$contextDepth.get()}`);
+}
+
 export function openChapterDrawer(section: ActiveSectionState) {
   $activeSection.set(section);
   $isDrawerOpen.set(true);
@@ -51,9 +101,6 @@ export function openChapterDrawer(section: ActiveSectionState) {
   }
 }
 
-/**
- * Closes the Chapter Reader Drawer cleanly.
- */
 export function closeChapterDrawer() {
   $isDrawerOpen.set(false);
 }

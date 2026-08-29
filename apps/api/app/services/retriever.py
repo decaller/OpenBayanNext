@@ -238,6 +238,30 @@ async def hybrid_search(
     offset = (page - 1) * limit
     paginated_results = final_items[offset:offset + limit]
 
+    # 8. Enrich Paginated Results with Author metadata and Preceding/Succeeding Chunks (N-1, N+1)
+    for p_item in paginated_results:
+        try:
+            n_res = await client.execute("""
+                SELECT p.chunk_id, p.chunk_order, p.raw_text, b.author_name, b.author_death_hijri
+                FROM prepared_chunks p
+                JOIN books b ON p.book_id = b.book_id
+                WHERE p.book_id = ? AND p.chunk_order IN (?, ?, ?)
+            """, [p_item.book_id, p_item.chunk_order - 1, p_item.chunk_order, p_item.chunk_order + 1])
+            
+            for nrow in n_res.rows:
+                c_id, c_order, c_text, auth_name, auth_death = nrow[0], nrow[1], nrow[2], nrow[3], nrow[4]
+                if not p_item.author_name:
+                    p_item.author_name = auth_name
+                    p_item.author_death_hijri = auth_death
+                if c_order == p_item.chunk_order - 1:
+                    p_item.preceding_chunk_id = c_id
+                    p_item.preceding_text = c_text
+                elif c_order == p_item.chunk_order + 1:
+                    p_item.succeeding_chunk_id = c_id
+                    p_item.succeeding_text = c_text
+        except Exception as e:
+            print(f"⚠️ Warning: context enrichment failed for chunk {p_item.chunk_id}: {e}")
+
     t_end = time.perf_counter()
     took_ms = (t_end - t_start) * 1000
 

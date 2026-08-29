@@ -20,6 +20,12 @@ const rawSnippet = chunk.text_snippet
 
 // Apply visual highlight to search terms
 const highlightedSnippet = highlightQueryTerms(rawSnippet, searchQuery);
+const highlightedPreceding = chunk.preceding_text 
+  ? highlightQueryTerms(chunk.preceding_text.slice(0, 260) + '...', searchQuery)
+  : null;
+const highlightedSucceeding = chunk.succeeding_text 
+  ? highlightQueryTerms(chunk.succeeding_text.slice(0, 260) + '...', searchQuery)
+  : null;
 
 // External Library URLs based on book_id and chunk_id
 const turathUrl = `https://turath.io/book/${chunk.book_id}`;
@@ -27,13 +33,13 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
 ---
 
 <article 
-  class="card bg-base-100 border border-base-200/90 hover:border-emerald-700/30 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden mb-4"
+  class="card bg-base-100 border border-base-200/90 hover:border-emerald-700/40 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden mb-4 group"
   id={`chunk-${chunk.chunk_id}`}
 >
-  <div class="card-body p-5 sm:p-6">
-    <!-- Top Metadata Bar -->
+  <div class="card-body p-5 sm:p-6 space-y-3">
+    <!-- Top Metadata & Header Bar -->
     <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-sans pb-3 border-b border-base-200/60">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         {rankIndex !== undefined && (
           <span class="badge badge-sm badge-neutral font-mono font-bold text-xs">
             #{rankIndex}
@@ -52,26 +58,106 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
         )}
       </div>
 
-      <!-- Relevance Score -->
-      <div class="text-base-content/50 text-[11px] font-mono">
-        RRF: {chunk.rrf_score.toFixed(4)}
+      <!-- Right: Drawer Quick-Open Button -->
+      <div class="flex items-center gap-1.5">
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs text-emerald-700 hover:text-emerald-900 font-bold gap-1"
+          data-open-drawer
+          data-book-id={chunk.book_id}
+          data-section-id={chunk.section_id}
+          data-section-title={chunk.section_title}
+          data-breadcrumb={chunk.breadcrumb}
+          data-chunk-id={chunk.chunk_id}
+          data-author-name={chunk.author_name || ''}
+          data-volume-page={chunk.volume_page}
+          title={t.exploreInSidebar}
+        >
+          <span>{t.exploreInSidebar}</span>
+        </button>
       </div>
     </div>
 
     <!-- Breadcrumb Hierarchy -->
-    <div class="text-xs font-sans text-base-content/65 flex items-center gap-1.5 my-1 overflow-hidden text-ellipsis whitespace-nowrap">
+    <div class="text-xs font-sans text-base-content/65 flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">
       <svg class="w-3.5 h-3.5 flex-shrink-0 text-emerald-700/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
-      <span>{chunk.breadcrumb}</span>
+      <span class="truncate">{chunk.breadcrumb}</span>
     </div>
 
-    <!-- Main Classical Text (Always RTL with Amiri Font) -->
-    <div 
-      class="arabic-matn text-base sm:text-lg text-base-content/90 my-2 leading-loose" 
-      dir="rtl"
-      set:html={highlightedSnippet}
-    />
+    <!-- ======================================================== -->
+    <!-- PASSAGE DISCOURSE CONTAINER (Snippet vs Context Mode) -->
+    <!-- ======================================================== -->
+    <div class="space-y-2.5 pt-1">
+      
+      <!-- 1. Preceding Discourse Block (Shown in Level-2 Context Mode) -->
+      {chunk.preceding_text && chunk.preceding_chunk_id && (
+        <div 
+          class="preceding-discourse-block bg-base-200/50 hover:bg-base-200/80 p-3 rounded-xl border-s-2 border-base-300 transition-colors font-sans text-xs cursor-pointer"
+          data-open-drawer
+          data-book-id={chunk.book_id}
+          data-section-id={chunk.section_id}
+          data-section-title={chunk.section_title}
+          data-breadcrumb={chunk.breadcrumb}
+          data-chunk-id={chunk.preceding_chunk_id}
+          title={t.exploreInSidebar}
+        >
+          <div class="flex items-center justify-between font-bold text-[11px] text-base-content/60 mb-1">
+            <span class="flex items-center gap-1">
+              <span>◀</span>
+              <span>{t.precedingDiscourse}</span>
+            </span>
+            <span class="text-emerald-700 hover:underline flex items-center gap-0.5 text-[11px]">
+              <span>{t.exploreInSidebar}</span>
+            </span>
+          </div>
+          <div class="arabic-matn text-sm sm:text-base text-base-content/75 leading-relaxed pt-0.5" dir="rtl" set:html={highlightedPreceding} />
+        </div>
+      )}
+
+      <!-- 2. Target Focus Chunk Block (Always Visible) -->
+      <div 
+        class="focus-discourse-block cursor-pointer transition-all"
+        data-open-drawer
+        data-book-id={chunk.book_id}
+        data-section-id={chunk.section_id}
+        data-section-title={chunk.section_title}
+        data-breadcrumb={chunk.breadcrumb}
+        data-chunk-id={chunk.chunk_id}
+        data-author-name={chunk.author_name || ''}
+        data-volume-page={chunk.volume_page}
+        title={t.exploreInSidebar}
+      >
+        <div class="arabic-matn text-base sm:text-lg text-base-content/90 leading-loose" dir="rtl" set:html={highlightedSnippet} />
+      </div>
+
+      <!-- 3. Succeeding Discourse Block (Shown in Level-2 Context Mode) -->
+      {chunk.succeeding_text && chunk.succeeding_chunk_id && (
+        <div 
+          class="succeeding-discourse-block bg-base-200/50 hover:bg-base-200/80 p-3 rounded-xl border-s-2 border-base-300 transition-colors font-sans text-xs cursor-pointer"
+          data-open-drawer
+          data-book-id={chunk.book_id}
+          data-section-id={chunk.section_id}
+          data-section-title={chunk.section_title}
+          data-breadcrumb={chunk.breadcrumb}
+          data-chunk-id={chunk.succeeding_chunk_id}
+          title={t.exploreInSidebar}
+        >
+          <div class="flex items-center justify-between font-bold text-[11px] text-base-content/60 mb-1">
+            <span class="flex items-center gap-1">
+              <span>▶</span>
+              <span>{t.succeedingDiscourse}</span>
+            </span>
+            <span class="text-emerald-700 hover:underline flex items-center gap-0.5 text-[11px]">
+              <span>{t.exploreInSidebar}</span>
+            </span>
+          </div>
+          <div class="arabic-matn text-sm sm:text-base text-base-content/75 leading-relaxed pt-0.5" dir="rtl" set:html={highlightedSucceeding} />
+        </div>
+      )}
+
+    </div>
 
     <!-- Footnotes Preview if present -->
     {chunk.footnotes && (
@@ -81,10 +167,15 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
       </div>
     )}
 
-    <!-- Bottom Actions Bar: External Editions, Copy for AI & Chapter Drawer -->
+    <!-- Bottom Actions Bar: External Editions, Copy for AI & Permalink -->
     <div class="flex flex-wrap items-center justify-between pt-3 mt-1 border-t border-base-200/60 font-sans gap-2">
-      <!-- Left: External Library Badges -->
+      <!-- Left: External Library Badges & Author -->
       <div class="flex items-center gap-1.5 flex-wrap text-xs">
+        {chunk.author_name && (
+          <span class="text-[11px] text-base-content/60 me-1">
+            <strong>{chunk.author_name}</strong> {chunk.author_death_hijri && `(ت: ${chunk.author_death_hijri} هـ)`} •
+          </span>
+        )}
         <span class="text-[11px] text-base-content/50 hidden sm:inline">{t.onlineBook}</span>
         <a 
           href={turathUrl} 
@@ -106,7 +197,7 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
         </a>
       </div>
 
-      <!-- Right: Copy for AI, Permalink & Chapter Drawer Bridge -->
+      <!-- Right: Copy for AI & Permalink Link -->
       <div class="flex items-center gap-2">
         <!-- Copy for AI Button -->
         <button
@@ -138,20 +229,6 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
           </svg>
           <span>{t.permalink}</span>
         </a>
-
-        <!-- Level-3 Chapter Drawer Trigger -->
-        <button 
-          type="button"
-          class="btn btn-sm btn-outline btn-success hover:!bg-emerald-800 hover:!text-white gap-1.5 font-bold"
-          data-open-drawer
-          data-book-id={chunk.book_id}
-          data-section-id={chunk.section_id}
-          data-section-title={chunk.section_title}
-          data-breadcrumb={chunk.breadcrumb}
-          data-chunk-id={chunk.chunk_id}
-        >
-          <span>{t.readFullChapter}</span>
-        </button>
       </div>
     </div>
   </div>

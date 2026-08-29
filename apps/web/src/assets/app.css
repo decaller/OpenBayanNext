@@ -23,13 +23,16 @@
   --border-subtle: #2d3339;
 }
 
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-paper);
   color: #2b2b2b;
   min-height: 100vh;
-  direction: rtl;
-  text-align: right;
 }
 
 [data-theme="dark"] body {
@@ -44,12 +47,87 @@ body {
   text-align: justify;
   text-justify: inter-word;
   font-feature-settings: "cv01", "cv02", "ss01";
+  transition: font-size 0.2s ease, line-height 0.2s ease;
 }
 
 .arabic-heading {
   font-family: var(--font-sans);
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+/* Floating Sticky Sidebar */
+.floating-sidebar {
+  position: sticky !important;
+  top: 5rem !important;
+  align-self: flex-start !important;
+  z-index: 20;
+}
+
+/* Reading & Display Controls Classes */
+.hide-highlights mark {
+  background-color: transparent !important;
+  color: inherit !important;
+  font-weight: normal !important;
+  padding: 0 !important;
+}
+
+.chunk-font-sm .arabic-matn {
+  font-size: 0.95rem !important;
+  line-height: 1.95 !important;
+}
+
+.chunk-font-base .arabic-matn {
+  font-size: 1.125rem !important;
+  line-height: 2.3 !important;
+}
+
+.chunk-font-lg .arabic-matn {
+  font-size: 1.35rem !important;
+  line-height: 2.5 !important;
+}
+
+.chunk-font-xl .arabic-matn {
+  font-size: 1.6rem !important;
+  line-height: 2.7 !important;
+}
+
+.compact-results article {
+  padding: 1rem 1.25rem !important;
+  border-radius: 1rem !important;
+}
+
+.compact-results .arabic-matn {
+  line-height: 1.9 !important;
+}
+
+/* Context Depth Levels */
+/* Default / Level 1 (Snippet): Strictly hide preceding and succeeding context */
+.preceding-discourse-block,
+.succeeding-discourse-block {
+  display: none !important;
+}
+
+.focus-discourse-block {
+  background-color: transparent !important;
+  border-inline-start-width: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Level 2: Context Mode (Show preceding & succeeding blocks like mockup) */
+#search-results-container.depth-level-2 .preceding-discourse-block,
+#search-results-container.depth-level-2 .succeeding-discourse-block {
+  display: block !important;
+}
+
+#search-results-container.depth-level-2 .focus-discourse-block {
+  background-color: rgba(16, 185, 129, 0.08) !important;
+  border-inline-start-width: 4px !important;
+  border-inline-start-color: #047857 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.875rem 1rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Visual Page Divider for Merged Sibling Passages */

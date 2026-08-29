@@ -2,16 +2,17 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PassageCard from '../components/astro/PassageCard.astro';
 import { SearchBar } from '../components/islands/SearchBar';
+import { SearchControls } from '../components/islands/SearchControls';
 import { INTERNAL_API_URL, type SearchResponse } from '../lib/api';
-import { translations, getLangFromUrl } from '../lib/i18n';
+import { translations, getLangFromUrl, formatAllSearchResultsPrompt } from '../lib/i18n';
+import { clusterSearchResults } from '../lib/thematic_clusterer';
 
 // Parse query params
 const currentLang = getLangFromUrl(Astro.url);
 const t = translations[currentLang];
 
 const query = Astro.url.searchParams.get('q') || '';
-const page = parseInt(Astro.url.searchParams.get('page') || '1', 10);
-const limit = 15;
+const limit = 60; // Fetch all candidate results in a single unified page
 const mode = (Astro.url.searchParams.get('mode') || 'hybrid') as 'hybrid' | 'fts' | 'vector';
 
 let searchData: SearchResponse | null = null;
@@ -19,7 +20,7 @@ let error: string | null = null;
 
 if (query.trim()) {
   try {
-    const fetchUrl = `${INTERNAL_API_URL}/search?q=${encodeURIComponent(query.trim())}&page=${page}&limit=${limit}&mode=${mode}&merge_siblings=true`;
+    const fetchUrl = `${INTERNAL_API_URL}/search?q=${encodeURIComponent(query.trim())}&page=1&limit=${limit}&mode=${mode}&merge_siblings=true`;
     const res = await fetch(fetchUrl);
     if (res.ok) {
       searchData = await res.json();
@@ -31,15 +32,17 @@ if (query.trim()) {
   }
 }
 
-const totalPages = searchData ? Math.ceil(searchData.total_hits / limit) : 0;
 const pageTitle = query ? `${t.resultsFor} "${query}" | ${t.appName}` : `${t.searchBtn} | ${t.appName}`;
 
-// Extract unique books in results for the outline
-const uniqueBooks = searchData 
-  ? Array.from(new Set(searchData.results.map(r => r.book_name)))
+// Build dynamic content-driven thematic clusters with query sentence accuracy
+const clusters = searchData 
+  ? clusterSearchResults(searchData.results, query, currentLang) 
   : [];
 
-const currentSearchUrl = Astro.url.href;
+// Pre-serialize full results for AI prompt
+const allResultsAIPrompt = searchData 
+  ? formatAllSearchResultsPrompt(searchData.results, query, currentLang)
+  : '';
 ---
 
 <BaseLayout title={pageTitle} lang={currentLang}>
@@ -62,37 +65,119 @@ const currentSearchUrl = Astro.url.href;
       </div>
     )}
 
-    <!-- Search Results Header & Stats -->
-    {searchData && (
-      <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-sans text-base-content/70 pb-3 border-b border-base-200">
-        <div>
-          <span>{t.resultsFor} <strong class="text-base-content text-sm">"{query}"</strong></span>
-          <span class="mx-2">({searchData.total_hits} {t.resultsCount} {searchData.took_ms} ms)</span>
-        </div>
-
-        <div class="text-[11px] font-mono opacity-60">
-          {t.pageOf} {page} / {totalPages || 1}
-        </div>
-      </div>
-    )}
-
-    <!-- Main Grid: 8 Cols (Results) + 4 Cols (Sticky Telemetry & AI Sidebar) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    <!-- Main Grid: 8 Cols (Thematic Groups) + 4 Cols (Sticky Floating Sidebar) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
       
-      <!-- Main Results Column (8 cols) -->
-      <section class="lg:col-span-8 space-y-4">
-        {searchData && searchData.results.length > 0 && (
-          <div class="space-y-4">
-            {searchData.results.map((item, idx) => (
-              <PassageCard 
-                chunk={item} 
-                rankIndex={(page - 1) * limit + idx + 1} 
-                lang={currentLang}
-                searchQuery={query}
-              />
-            ))}
-          </div>
-        )}
+      <!-- Main Results Column (8 cols): Thematic Structured Groups -->
+      <section id="search-results-container" class="lg:col-span-8 space-y-10 depth-level-1">
+        
+        {clusters.map((cluster) => {
+          // Limit every thematic cluster to top 5 results on the page
+          const topResults = cluster.results.slice(0, 5);
+          const themeQuery = cluster.rawTopic || cluster.title;
+          const themeQueryUrl = `/search?q=${encodeURIComponent(themeQuery)}&mode=${mode}&lang=${currentLang}`;
+
+          return (
+            <section id={cluster.id} class="space-y-4 scroll-mt-24">
+              <!-- Thematic Group Header Banner -->
+              <div class="bg-base-100/90 border-s-4 border-emerald-700 p-5 rounded-2xl border border-base-200 shadow-xs font-sans space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="badge badge-neutral font-bold text-xs">
+                      {cluster.clusterIndex}
+                    </span>
+                    <h3 class="text-base sm:text-lg font-bold text-base-content tracking-tight">
+                      {cluster.title}
+                    </h3>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <!-- Thematic Query Sentence Accuracy Badge -->
+                    <span 
+                      class="badge badge-sm bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 font-mono font-bold text-[11px] gap-1"
+                      title={`${t.matchAccuracy}: ${cluster.accuracy_percentage}%`}
+                    >
+                      <svg class="w-3 h-3 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{cluster.accuracy_percentage}%</span>
+                    </span>
+
+                    <!-- Real total passage count found under this theme -->
+                    <span class="badge badge-sm badge-ghost font-mono" title={`${cluster.doc_count} passages found in this theme`}>
+                      {cluster.doc_count} {t.passages}
+                      {cluster.doc_count > 5 && (
+                        <span class="text-[10px] text-base-content/50 ms-1">
+                          ({currentLang === 'en' ? 'showing top 5' : currentLang === 'id' ? 'tampil 5 teratas' : 'عُرضت ٥'})
+                        </span>
+                      )}
+                    </span>
+                    
+                    <!-- Search This Topic Button in Header -->
+                    <a
+                      href={themeQueryUrl}
+                      class="btn btn-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 font-bold gap-1 transition-all rounded-lg"
+                      title={t.searchThisTheme}
+                    >
+                      <svg class="w-3 h-3 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>{t.searchThisTheme} ↗</span>
+                    </a>
+                  </div>
+                </div>
+
+                <p class="text-xs text-base-content/70 leading-relaxed">
+                  {cluster.summary}
+                </p>
+
+                <!-- Dominant Roots & Primary Sources Bar -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-base-200/60 text-[11px] text-base-content/60">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-bold text-base-content/70">{t.dominantRoots}</span>
+                    <div class="flex gap-1">
+                      {cluster.dominant_roots.map(r => (
+                        <span class="badge badge-xs badge-outline font-mono font-bold text-emerald-800 dark:text-emerald-400">
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1">
+                    <span class="font-bold text-base-content/70">{t.primarySources}</span>
+                    <span>{cluster.primary_sources.join(' • ')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top 5 Passages in this Thematic Cluster -->
+              <div class="space-y-4">
+                {topResults.map((item, idx) => (
+                  <PassageCard 
+                    chunk={item} 
+                    rankIndex={idx + 1} 
+                    lang={currentLang}
+                    searchQuery={query}
+                  />
+                ))}
+              </div>
+
+              <!-- Bottom Action: Deep Dive into This Thematic Topic -->
+              <div class="text-center pt-1 pb-2">
+                <a
+                  href={themeQueryUrl}
+                  class="btn btn-sm btn-outline border-dashed border-base-300 hover:border-emerald-600 text-base-content/70 hover:text-emerald-800 text-xs font-sans rounded-xl gap-1.5 transition-all w-full sm:w-auto"
+                >
+                  <svg class="w-3.5 h-3.5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span>{t.searchThisTheme}: <strong>"{themeQuery}"</strong> ↗</span>
+                </a>
+              </div>
+            </section>
+          );
+        })}
 
         <!-- Empty State -->
         {searchData && searchData.results.length === 0 && (
@@ -106,126 +191,123 @@ const currentSearchUrl = Astro.url.href;
             </p>
           </div>
         )}
-
-        <!-- SSR Pagination Controls -->
-        {totalPages > 1 && (
-          <div class="flex items-center justify-center gap-2 pt-8 pb-12 font-sans">
-            {page > 1 ? (
-              <a
-                href={`/search?q=${encodeURIComponent(query)}&mode=${mode}&page=${page - 1}&lang=${currentLang}`}
-                class="btn btn-sm btn-outline btn-neutral"
-              >
-                {t.prevPage}
-              </a>
-            ) : (
-              <button disabled class="btn btn-sm btn-disabled opacity-40">
-                {t.prevPage}
-              </button>
-            )}
-
-            <span class="text-xs font-bold px-3">
-              {page} / {totalPages}
-            </span>
-
-            {page < totalPages ? (
-              <a
-                href={`/search?q=${encodeURIComponent(query)}&mode=${mode}&page=${page + 1}&lang=${currentLang}`}
-                class="btn btn-sm btn-outline btn-neutral"
-              >
-                {t.nextPage}
-              </a>
-            ) : (
-              <button disabled class="btn btn-sm btn-disabled opacity-40">
-                {t.nextPage}
-              </button>
-            )}
-          </div>
-        )}
       </section>
 
-      <!-- Sticky Sidebar Column (4 cols) -->
-      <aside class="lg:col-span-4 space-y-5 font-sans">
-        <div class="sticky top-20 space-y-5">
+      <!-- Sticky Floating Sidebar Column (4 cols) -->
+      <aside class="lg:col-span-4 floating-sidebar space-y-4 font-sans max-h-[calc(100vh-6.5rem)] overflow-y-auto pr-1">
+        <div class="space-y-4">
           
-          <!-- Performance Telemetry Box -->
-          {searchData && (
-            <div class="bg-base-100 border border-base-200 rounded-2xl p-4 shadow-xs space-y-3 text-xs">
-              <div class="flex items-center justify-between pb-2 border-b border-base-200/60 font-bold text-base-content/80">
-                <span>{t.retrievalTelemetry}</span>
-                <span class="font-mono text-emerald-700 font-bold">{searchData.took_ms} ms</span>
+          <!-- 1. Thematic Structure Navigation Outline -->
+          {clusters.length > 0 && (
+            <div class="bg-base-100 border border-base-200 rounded-2xl p-4 shadow-sm space-y-3">
+              <div class="flex items-center justify-between pb-2 border-b border-base-200/60 font-bold text-xs text-base-content">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <span>{t.thematicStructure}</span>
+                </div>
+                <span class="badge badge-xs badge-neutral font-mono">{clusters.length} {t.sectionsCount}</span>
               </div>
 
-              <div class="space-y-2 text-base-content/70">
-                <div class="flex justify-between">
-                  <span class="text-base-content/50">{t.retrievalMode}</span>
-                  <span class="font-bold text-emerald-800 dark:text-emerald-400">
-                    {mode === 'hybrid' ? t.modeHybrid : mode === 'fts' ? t.modeFts : t.modeVector}
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-base-content/50">Database Engine:</span>
-                  <span class="font-mono">SQLite FTS5 + ONNX</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-base-content/50">Dense Vector Dim:</span>
-                  <span class="font-mono text-emerald-800 font-semibold">768-dim</span>
-                </div>
+              <!-- Scrollable Thematic Navigation List (Max-height 52) -->
+              <div class="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {clusters.map((cl) => (
+                  <a
+                    href={`#${cl.id}`}
+                    data-smooth-scroll
+                    class="block p-3 rounded-xl border border-base-200/80 hover:border-emerald-600 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-all text-xs group"
+                  >
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="font-bold text-base-content group-hover:text-emerald-800 dark:group-hover:text-emerald-400">
+                        {cl.title}
+                      </span>
+                      <div class="flex items-center gap-1">
+                        <!-- Navigation Item Accuracy Badge -->
+                        <span class="badge badge-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-mono font-bold" title={t.matchAccuracy}>
+                          {cl.accuracy_percentage}%
+                        </span>
+                        <span class="badge badge-xs badge-ghost font-mono" title={`${cl.doc_count} passages found`}>
+                          {cl.doc_count}
+                        </span>
+                      </div>
+                    </div>
+                    <p class="text-[11px] text-base-content/60 truncate">
+                      {cl.summary}
+                    </p>
+                  </a>
+                ))}
               </div>
+
+              <!-- Telemetry Metrics inside Sidebar -->
+              {searchData && (
+                <div class="pt-3 border-t border-base-200/60 space-y-1.5 text-xs text-base-content/70">
+                  <div class="flex justify-between">
+                    <span class="text-base-content/50">{t.retrievalMode}</span>
+                    <span class="font-bold text-emerald-800 dark:text-emerald-400">
+                      {mode === 'hybrid' ? t.modeHybrid : mode === 'fts' ? t.modeFts : t.modeVector}
+                    </span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/50">{t.tookTime}</span>
+                    <span class="font-mono text-emerald-700 font-bold">{searchData.took_ms} ms</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/50">{t.engine}</span>
+                    <span class="font-mono">SQLite FTS5 + ONNX</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          <!-- AI PAGE URL EXPLORER CARD -->
+          <!-- 2. Simplified AI Grounding Card with Side-by-Side Buttons -->
           {searchData && searchData.results.length > 0 && (
-            <div class="bg-gradient-to-br from-stone-900 to-slate-950 text-white rounded-2xl p-5 shadow-sm border border-stone-800 space-y-3 text-xs">
-              <div class="flex items-center gap-2 font-bold text-emerald-400">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>{t.exploreWithAI}</span>
+            <div class="bg-gradient-to-br from-stone-900 to-slate-950 text-white rounded-2xl p-4 shadow-sm border border-stone-800 space-y-3 text-xs">
+              <div class="flex items-center justify-between font-bold text-emerald-400 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>{t.exploreWithAI}</span>
+                </div>
+                <span class="text-[10px] text-stone-400 font-mono">{searchData.results.length} {t.passages}</span>
               </div>
-              
-              <p class="text-stone-300 leading-relaxed text-[11px]">
-                {t.exploreWithAIDesc}
-              </p>
 
-              <!-- URL & Copy Button -->
-              <div class="space-y-2 pt-1">
-                <input
-                  type="text"
-                  readonly
-                  value={currentSearchUrl}
-                  class="w-full bg-black/50 border border-stone-700 rounded-lg px-2.5 py-1.5 font-mono text-[10px] text-emerald-300 select-all"
-                />
+              <!-- Side-by-Side Copy Buttons -->
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <!-- Button 1: Copy Full Dataset -->
+                <button
+                  type="button"
+                  id="copy-all-results-btn-sidebar"
+                  class="btn btn-sm bg-stone-800 hover:bg-stone-700 text-emerald-300 font-bold border border-stone-700 gap-1 text-[11px] px-2 justify-center"
+                  title={t.copyAllResultsForAI}
+                >
+                  <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span class="truncate">{currentLang === 'en' ? 'Full Data' : currentLang === 'id' ? 'Teks Lengkap' : 'كامل النصوص'}</span>
+                </button>
 
+                <!-- Button 2: Copy Page URL -->
                 <button
                   type="button"
                   id="copy-page-url-btn"
-                  class="w-full btn btn-sm bg-emerald-700 hover:bg-emerald-800 text-white font-bold border-0 gap-1.5 text-xs"
+                  class="btn btn-sm bg-emerald-700 hover:bg-emerald-800 text-white font-bold border-0 gap-1 text-[11px] px-2 justify-center"
+                  title={t.copyPageUrlForAI}
                 >
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
-                  <span>{t.copyPageUrlForAI}</span>
+                  <span class="truncate">{currentLang === 'en' ? 'Page URL' : currentLang === 'id' ? 'Tautan URL' : 'رابط الصفحة'}</span>
                 </button>
               </div>
             </div>
           )}
 
-          <!-- Books in Results Outline -->
-          {uniqueBooks.length > 0 && (
-            <div class="bg-base-100 border border-base-200 rounded-2xl p-4 shadow-xs space-y-2.5 text-xs">
-              <div class="font-bold text-base-content/80 pb-2 border-b border-base-200/60">
-                {t.thematicOutline} ({uniqueBooks.length})
-              </div>
-              <ul class="space-y-1.5 text-base-content/70">
-                {uniqueBooks.map((book) => (
-                  <li class="flex items-center gap-1.5 truncate">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
-                    <span class="truncate">{book}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <!-- 3. Reading & Display Controls Card (Placed Last with i18n support) -->
+          {searchData && searchData.results.length > 0 && (
+            <SearchControls client:load lang={currentLang} />
           )}
 
         </div>
@@ -234,22 +316,50 @@ const currentSearchUrl = Astro.url.href;
     </div>
   </div>
 
-  <!-- Client Script for Copy Page URL Button -->
-  <script>
-    const btn = document.getElementById('copy-page-url-btn');
-    if (btn) {
-      btn.addEventListener('click', () => {
+  <!-- Client Script for Smooth Scrolling and Copy Buttons -->
+  <script define:vars={{ allResultsAIPrompt, copiedText: t.copied }}>
+    // 1. Smooth Scroll for Thematic Navigation Anchors
+    document.querySelectorAll('[data-smooth-scroll]').forEach(anchor => {
+      anchor.addEventListener('click', (e) => {
+        e.preventDefault();
+        const href = anchor.getAttribute('href');
+        if (!href) return;
+        const targetId = href.replace('#', '');
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.pushState(null, '', '#' + targetId);
+        }
+      });
+    });
+
+    function showGlobalToast(msg) {
+      const toastEl = document.getElementById('global-toast');
+      const toastText = document.getElementById('global-toast-text');
+      if (toastEl && toastText) {
+        toastText.textContent = msg;
+        toastEl.classList.remove('hidden');
+        setTimeout(() => toastEl.classList.add('hidden'), 3000);
+      }
+    }
+
+    // 2. Copy Full Corpus Results
+    const copyAllSidebarBtn = document.getElementById('copy-all-results-btn-sidebar');
+    if (copyAllSidebarBtn) {
+      copyAllSidebarBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(allResultsAIPrompt);
+        showGlobalToast(copiedText);
+      });
+    }
+
+    // 3. Copy Page URL
+    const pageUrlBtn = document.getElementById('copy-page-url-btn');
+    if (pageUrlBtn) {
+      pageUrlBtn.addEventListener('click', () => {
         const queryUrl = window.location.href;
         const prompt = `Please analyze and synthesize the classical Islamic corpus search results available at this live URL:\n${queryUrl}\n\nTask: Explore the primary source passages on this page, evaluate the key definitions and rulings, and summarize the consensus across Sunni schools.`;
         navigator.clipboard.writeText(prompt);
-
-        const toastEl = document.getElementById('global-toast');
-        const toastText = document.getElementById('global-toast-text');
-        if (toastEl && toastText) {
-          toastText.textContent = 'Page AI prompt copied!';
-          toastEl.classList.remove('hidden');
-          setTimeout(() => toastEl.classList.add('hidden'), 3000);
-        }
+        showGlobalToast(copiedText);
       });
     }
   </script>
