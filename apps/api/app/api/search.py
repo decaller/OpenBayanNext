@@ -2,6 +2,7 @@ from typing import List, Optional, Literal
 from fastapi import APIRouter, Query, HTTPException
 from app.services.retriever import search_hybrid
 from app.schemas.search import SearchResponse
+from app.services.telemetry import telemetry_tracker
 
 router = APIRouter(prefix="/search", tags=["Search"])
 
@@ -29,7 +30,7 @@ async def search_endpoint(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid book_ids format. Expected comma-separated integers.")
 
-    return await search_hybrid(
+    response = await search_hybrid(
         query=q,
         page=page,
         limit=limit,
@@ -40,3 +41,11 @@ async def search_endpoint(
         merge_siblings=merge_siblings,
         book_ids=parsed_book_ids
     )
+
+    # Record telemetry
+    try:
+        telemetry_tracker.record_query(q, response.took_ms)
+    except Exception:
+        pass
+
+    return response

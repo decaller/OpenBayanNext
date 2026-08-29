@@ -9,6 +9,7 @@ from app.services.retriever import vector_matrix_cache
 from app.api.search import router as search_router
 from app.api.chunks import router as chunks_router
 from app.api.books import router as books_router
+from app.api.telemetry import router as telemetry_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,7 +21,7 @@ async def lifespan(app: FastAPI):
     
     # 3. Pre-load RAM Vector Matrix for Instant Sub-4ms Fallbacks
     try:
-        await vector_matrix_cache.load(db.client)
+        await vector_matrix_cache.load_if_needed()
     except Exception as e:
         print(f"⚠️ Vector cache load skipped: {e}")
         
@@ -51,6 +52,7 @@ app.add_middleware(
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(chunks_router, prefix="/api/v1")
 app.include_router(books_router, prefix="/api/v1")
+app.include_router(telemetry_router, prefix="/api/v1")
 
 @app.get("/health", tags=["Diagnostic"])
 async def health_check():
@@ -81,6 +83,7 @@ async def root():
             "chunks": "/api/v1/chunks/{id}",
             "surrounding": "/api/v1/chunks/{id}/surrounding",
             "books": "/api/v1/books",
+            "telemetry": "/api/v1/telemetry/stats",
             "chapter_stream": "/api/v1/books/{id}/sections/{sec_id}/chunks"
         }
     }

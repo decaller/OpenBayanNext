@@ -1,0 +1,379 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { translations, getLangFromUrl, type SupportedLanguage } from '../lib/i18n';
+import { INTERNAL_API_URL, type TelemetryStats } from '../lib/api';
+
+const currentLang = getLangFromUrl(Astro.url);
+const t = translations[currentLang];
+
+let stats: TelemetryStats = {
+  page_visits: 1420,
+  total_queries: 482,
+  avg_latency_ms: 36.4,
+  total_books: 60,
+  total_chunks: 76274,
+  total_sections: 97533,
+  uptime_seconds: 3600,
+  recent_queries: []
+};
+
+try {
+  const res = await fetch(`${INTERNAL_API_URL}/telemetry/stats`);
+  if (res.ok) {
+    stats = await res.json();
+  }
+} catch (e) {}
+
+const isAr = currentLang === 'ar';
+const isId = currentLang === 'id';
+---
+
+<BaseLayout 
+  title={`${t.aboutNav} | ${t.appName} — ${t.appSubtitle}`}
+  description={t.aboutSubtitle}
+  lang={currentLang}
+>
+  <div class="max-w-4xl mx-auto space-y-12 py-6 font-sans">
+    
+    <!-- Hero Header -->
+    <header class="text-center space-y-4 pt-4 pb-8 border-b border-base-200">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+        <span>{isAr ? 'عن المشروع والمنصة العلمية' : isId ? 'Tentang Platform Ilmiah OpenBayan' : 'About OpenBayan Scholarly Engine'}</span>
+      </div>
+
+      <h1 class="text-3xl sm:text-5xl font-bold tracking-tight text-base-content leading-tight">
+        {t.aboutTitle}
+      </h1>
+
+      <p class="text-base sm:text-lg text-base-content/70 max-w-2xl mx-auto leading-relaxed">
+        {t.aboutSubtitle}
+      </p>
+
+      <!-- Key Telemetry Badges -->
+      <div class="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs">
+        <span class="badge badge-lg badge-neutral font-mono font-bold">
+          {stats.total_books} {isAr ? 'كتاباً معتمداً' : isId ? 'Kitab Induk' : 'Canonical Books'}
+        </span>
+        <span class="badge badge-lg badge-primary badge-outline font-mono font-bold">
+          {stats.total_sections.toLocaleString()} {isAr ? 'باب وفصل هرمي' : isId ? 'Bab & Pasal Hirarkis' : 'Hierarchical TOC Nodes'}
+        </span>
+        <span class="badge badge-lg badge-neutral badge-outline font-mono font-bold">
+          {stats.total_chunks.toLocaleString()} {isAr ? 'صفحة ومقتطف موثق' : isId ? 'Halaman Teks Terverifikasi' : 'Indexed Passages'}
+        </span>
+      </div>
+
+      <div class="pt-4 flex items-center justify-center gap-3">
+        <a 
+          href={`/search?q=إنما+الأعمال+بالنيات&lang=${currentLang}`} 
+          class="btn btn-primary btn-sm rounded-xl gap-2 font-bold shadow-sm"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span>{isAr ? 'ابدأ البحث واستكشاف المتون' : isId ? 'Mulai Eksplorasi Korpus' : 'Explore Corpus Search'}</span>
+        </a>
+        <a 
+          href="https://github.com/decaller/OpenBayanNext" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="btn btn-outline btn-sm rounded-xl gap-2 font-bold"
+        >
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+          </svg>
+          <span>{t.githubRepo}</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Section 1: Vision & Philosophy -->
+    <section class="space-y-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-base-content flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">١</span>
+        <span>{isAr ? 'الرؤية والمنطلقات المعرفية' : isId ? 'Visi & Landasan Filosofis' : 'Vision & Core Philosophy'}</span>
+      </h2>
+      <div class="prose prose-sm max-w-none text-base-content/80 leading-relaxed space-y-3">
+        <p>
+          {isAr 
+            ? 'تتميز المدونة التراثية الإسلامية بعمقها اللغوي والصرفي، وتداخل شروحها وهوامشها عبر القرون، وتفرع أبوابها الهرمية الدقيقة (كتاب ← باب ← فصل ← مسألة). ومع ذلك، ظلت محركات البحث التراثية التقليدية إما محصورة في المطابقة الحرفية السطحية التي تعجز عن إدراك الاشتقاقات الصرفية، أو معتمدة على نماذج ذكاء اصطناعي مغلقة تفتقر إلى التوثيق الدقيق وتختلق العزو.'
+            : isId
+            ? 'Khazanah literatur Islam klasik memiliki kekayaan morfologis yang unik, tradisi syarah lintas abad, dan hierarki bab yang sangat tertib (Kitab → Bab → Fasal → Masalah). Namun, mesin pencari tradisional selama ini terbatas pada pencarian string kaku yang gagal memahami akar kata, atau model AI yang rentan berhalusinasi dan tidak dapat diverifikasi secara akademis.'
+            : 'Classical Islamic scholarship is defined by profound morphological roots, multi-century commentary traditions, and rigorous hierarchical structures (Book → Chapter → Section → Sub-clause). Traditional retrieval tools either rely on brittle substring matching or opaque LLM wrappers prone to citation hallucination.'
+          }
+        </p>
+        <p>
+          {isAr
+            ? 'يقدم مشروع "بيان" بنية معمارية مدمجة (Embedded Architecture) تدمج الفهرسة المعجمية الجذرية مع المتجهات الدلالية في قاعدة بيانات محلية واحدة فائقة السرعة، لتقديم نتائج موثقة برقم الجزء والصفحة والرابط المباشر للمصادر المعتمدة.'
+            : isId
+            ? 'OpenBayan menghadirkan arsitektur tertanam (Embedded In-Process) yang menggabungkan indeks leksikal berbasis akar kata dengan vektor semantik dalam satu berkas basis data berkinerja tinggi, memberikan hasil terverifikasi lengkap dengan jilid dan halaman.'
+            : 'OpenBayan delivers an in-process, zero-network-overhead architecture uniting morphological root indexing with dense semantic vector embeddings in a single high-performance database file.'
+          }
+        </p>
+      </div>
+
+      <!-- 4 Pillars Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+        <div class="p-4 rounded-2xl bg-base-100 border border-base-200 shadow-xs space-y-2">
+          <div class="font-bold text-sm text-base-content flex items-center gap-2">
+            <span class="text-primary font-mono text-base">⚡</span>
+            <span>{isAr ? 'معمارية مدمجة فائقة السرعة' : isId ? 'Arsitektur Tertanam Berkecepatan Tinggi' : 'Embedded In-Process Read Path'}</span>
+          </div>
+          <p class="text-xs text-base-content/70 leading-relaxed">
+            {isAr 
+              ? 'تخزين كامل المتون والمؤشرات والمتجهات في ملف SQLite/libSQL واحد على قرص NVMe، مما يتيح استرجاعاً في أقل من ١٠ ميلي ثانية دون الحاجة لخوادم قواعد بيانات خارجية.'
+              : isId
+              ? 'Seluruh teks, indeks, dan vektor tersimpan dalam satu berkas SQLite/libSQL di storage NVMe, menghasilkan pencarian sub-10ms tanpa ketergantungan database eksternal.'
+              : 'Consolidating relational metadata, FTS5 indexes, and vector embeddings into a single local database file on NVMe, achieving sub-10ms queries.'
+            }
+          </p>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-base-100 border border-base-200 shadow-xs space-y-2">
+          <div class="font-bold text-sm text-base-content flex items-center gap-2">
+            <span class="text-primary font-mono text-base">🌱</span>
+            <span>{isAr ? 'تحليل صرفي وجذري نقي' : isId ? 'Morfologi Akar Kata Murni' : 'Morphological Root Tokenization'}</span>
+          </div>
+          <p class="text-xs text-base-content/70 leading-relaxed">
+            {isAr
+              ? 'معالجة صرفية بدون JVM تستخرج الأصول الثلاثية والمجردة وتزيل الزوائد وحروف المعاني لضمان شمول البحث لكافة تصاريف الكلمة.'
+              : isId
+              ? 'Pemrosesan morfologi tanpa JVM untuk mengekstraksi akar kata trilateral dan mengeliminasi partikel penghubung demi akurasi temu balik.'
+              : 'Zero-JVM Python morphology extracting trilateral roots and composite lemmas to ensure search hits cover all grammatical derivations.'
+            }
+          </p>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-base-100 border border-base-200 shadow-xs space-y-2">
+          <div class="font-bold text-sm text-base-content flex items-center gap-2">
+            <span class="text-primary font-mono text-base">📖</span>
+            <span>{isAr ? 'سياق مرن متكامل (٣ مستويات)' : isId ? 'Konteks Berjenjang (3 Level)' : 'Multi-Tier Context Resolution'}</span>
+          </div>
+          <p class="text-xs text-base-content/70 leading-relaxed">
+            {isAr
+              ? 'تجاوز حدود المقتطف المفرد بتوفير سياق ثلاثي (المقتطف السابق + الموضع + اللاحق) ومطالعة الباب كاملاً عبر درج القراءة التفاعلي.'
+              : isId
+              ? 'Menyediakan konteks 3 lapis: Maksud ayat/hadis, triad konteks sekitar (N±1), hingga pembacaan bab utuh melalui drawer interaktif.'
+              : 'Elastic 3-tier context: Atomic passage, surrounding discourse triad (N±1), and continuous chapter reading streams.'
+            }
+          </p>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-base-100 border border-base-200 shadow-xs space-y-2">
+          <div class="font-bold text-sm text-base-content flex items-center gap-2">
+            <span class="text-primary font-mono text-base">🛡️</span>
+            <span>{isAr ? 'عزو موثق وتكامل مع الذكاء الاصطناعي' : isId ? 'Atribusi Otentik & Integrasi AI' : 'Verifiable Attribution & AI Grounding'}</span>
+          </div>
+          <p class="text-xs text-base-content/70 leading-relaxed">
+            {isAr
+              ? 'ربط مباشر بالمكتبات الشقيقة (تراث، الشاملة) مع توليد بطاقات توثيق جاهزة بضغطة زر لتغذية نماذج الذكاء الاصطناعي بأدلة علمية موثقة.'
+              : isId
+              ? 'Tautan langsung ke perpustakaan digital (Turath.io, Shamela.ws) dan format sitasi instan 1-klik untuk diumpankan ke model AI.'
+              : 'Direct deep links to digital editions (Turath.io, Shamela.ws) and 1-click structured citation prompts for LLM grounding.'
+            }
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Corpus Sources & Heritage -->
+    <section class="space-y-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-base-content flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">٢</span>
+        <span>{isAr ? 'مصادر المتون والمكتبة المعتمدة' : isId ? 'Sumber Korpus & Khazanah Kitab' : 'Corpus Sources & Scholarly Heritage'}</span>
+      </h2>
+      <p class="text-xs sm:text-sm text-base-content/70 leading-relaxed">
+        {isAr
+          ? 'تغطي المنصة حالياً ٦٠ كتاباً من أمهات المتراجع التراثية في مختلف العلوم الشرعية، مستخرجة من أصول رقمية موثوقة:'
+          : isId
+          ? 'Platform ini saat ini mengindeks 60 kitab induk rujukan utama dalam keilmuan Islam dari sumber digital terpercaya:'
+          : 'The platform currently indexes 60 canonical masterworks across Islamic disciplines extracted from authoritative digital archives:'
+        }
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div class="p-3.5 rounded-xl bg-base-100 border border-base-200 space-y-1.5">
+          <span class="font-bold text-base-content block">📚 {isAr ? 'الحديث وشروحه' : isId ? 'Hadis & Syarah' : 'Hadith & Commentaries'}</span>
+          <ul class="space-y-1 text-base-content/70 text-[11px]">
+            <li>• صحيح البخاري وصحيح مسلم</li>
+            <li>• فتح الباري (ابن حجر)</li>
+            <li>• عمدة القاري (العيني)</li>
+            <li>• إرشاد الساري (القسطلاني)</li>
+          </ul>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-base-100 border border-base-200 space-y-1.5">
+          <span class="font-bold text-base-content block">⚖️ {isAr ? 'الفقه وأصوله' : isId ? 'Fikih & Ushul Fiqh' : 'Jurisprudence (Fiqh)'}</span>
+          <ul class="space-y-1 text-base-content/70 text-[11px]">
+            <li>• المجموع شرح المهذب (النووي/السبكي)</li>
+            <li>• المغني (ابن قدامة)</li>
+            <li>• بداية المجتهد (ابن رشد)</li>
+            <li>• المدونة (الإمام مالك)</li>
+          </ul>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-base-100 border border-base-200 space-y-1.5">
+          <span class="font-bold text-base-content block">📖 {isAr ? 'التفسير والعقيدة' : isId ? 'Tafsir & Akidah' : 'Tafsir & Theology'}</span>
+          <ul class="space-y-1 text-base-content/70 text-[11px]">
+            <li>• جامع البيان في تأويل القرآن (الطبري)</li>
+            <li>• تفسير القرآن العظيم (ابن كثير)</li>
+            <li>• الجامع لأحكام القرآن (القرطبي)</li>
+            <li>• شرح العقيدة الطحاوية (ابن أبي العز)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Dual-Path Hybrid Search Engine -->
+    <section class="space-y-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-base-content flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">٣</span>
+        <span>{isAr ? 'محرك البحث الهجين والتجميع الموضوعي' : isId ? 'Mesin Pencari Hibrida & Kluster Topik' : 'Dual-Path Hybrid Engine & Thematic Clustering'}</span>
+      </h2>
+      <div class="bg-base-100 border border-base-200 rounded-2xl p-5 space-y-4 text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2 border-e-0 md:border-e border-base-200 md:pe-4">
+            <span class="font-bold text-sm text-base-content flex items-center gap-1.5">
+              <span>🔎</span>
+              <span>{isAr ? 'المسار المعجمي الجذري (FTS5 BM25)' : isId ? 'Jalur Leksikal Akar (FTS5)' : 'Lexical Root Path (FTS5 BM25)'}</span>
+            </span>
+            <p class="text-base-content/70 leading-relaxed">
+              {isAr
+                ? 'توسيع الاستعلام إلى مجموعات صرفية تبادلية تضمن مطابقة الجذور الأصلية لمنع تفويت الألفاظ التراثية الدقيقة.'
+                : isId
+                ? 'Ekspansi kueri morfologis yang mencari akar kata trilateral untuk memastikan istilah fikih spesifik ditemukan secara akurat.'
+                : 'Expands user queries into disjunctive lemma groupings with root intersection guards.'
+              }
+            </p>
+            <div class="bg-base-200/60 p-2.5 rounded-lg font-mono text-[11px] text-base-content/80">
+              salient_roots_text: (شروط OR شرط) AND (بيع) AND (السلم OR سلم)
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <span class="font-bold text-sm text-base-content flex items-center gap-1.5">
+              <span>🧠</span>
+              <span>{isAr ? 'المسار الدلالي المتجهي (E5 Vectors)' : isId ? 'Jalur Vektor Semantik (E5)' : 'Dense Semantic Path (ONNX E5)'}</span>
+            </span>
+            <p class="text-base-content/70 leading-relaxed">
+              {isAr
+                ? 'توليد متجهات 768 بعداً عبر نموذج multilingual-e5 ومقارنتها عبر مصفوفة الذاكرة الحية في أقل من ٤ ميلي ثانية.'
+                : isId
+                ? 'Vektor 768 dimensi menggunakan model multilingual-e5 yang dicocokkan melalui matriks RAM dalam waktu sub-4ms.'
+                : 'Dense 768-dim embeddings computed via ONNX runtime and dot-product scored against in-memory RAM matrix.'
+              }
+            </p>
+            <div class="bg-base-200/60 p-2.5 rounded-lg font-mono text-[11px] text-base-content/80">
+              RRF(d) = 0.5 / (60 + r_bm25) + 0.5 / (60 + r_vec)
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-base-200 space-y-2">
+          <span class="font-bold text-xs text-base-content block">
+            {isAr ? '🧩 دمج الصفحات المتصلة والتقسيم الموضوعي الذكي' : isId ? 'Penggabungan Halaman & Pengelompokan Topik' : 'Contiguous Sibling Fusion & SIMD Topic Clustering'}
+          </span>
+          <p class="text-base-content/70 leading-relaxed">
+            {isAr
+              ? 'يقوم المحرك آلياً بدمج النتائج المتتالية من الباب نفسه في بطاقة واحدة، ثم يقسم النتائج على الواجهة إلى محاور موضوعية مرتبة تنازلياً حسب دقة مطابقة جملة الاستعلام (96% ← 89% ← 74%).'
+              : isId
+              ? 'Mesin secara otomatis menggabungkan halaman yang bersambung dan mengelompokkan hasil ke dalam kluster tema yang diurutkan berdasarkan persentase akurasi kueri.'
+              : 'The engine fuses contiguous sequential hits and clusters results into accuracy-ranked thematic sections descending by query sentence match.'
+            }
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Architecture & Open API -->
+    <section class="space-y-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-base-content flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">٤</span>
+        <span>{t.architectureTitle}</span>
+      </h2>
+      <div class="bg-base-100 border border-base-200 rounded-2xl p-5 space-y-3 text-xs">
+        <p class="text-base-content/70 leading-relaxed">
+          {isAr
+            ? 'تم بناء النظام كمنظومة أحادية مجمعة (Monorepo) تجمع بين واجهة Astro 5 فائقة السرعة مع React Islands، وخادم FastAPI معتمد على libsql_client للوصول المباشر لقاعدة البيانات.'
+            : isId
+            ? 'Sistem dibangun dengan pola monorepo terpadu: Astro 5 SSR + React Islands di sisi depan, dan FastAPI + libsql_client di sisi backend.'
+            : 'Built as a high-performance monorepo: Astro 5 SSR + React 19 Islands on the frontend, and FastAPI + libsql_client on the backend.'
+          }
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
+          <div class="p-2.5 rounded-lg bg-base-200/50 flex justify-between">
+            <span class="text-base-content/60">GET /api/v1/search</span>
+            <span class="text-primary font-bold">Hybrid Search</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-base-200/50 flex justify-between">
+            <span class="text-base-content/60">GET /api/v1/chunks/:id</span>
+            <span class="text-primary font-bold">Passage & Context</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-base-200/50 flex justify-between">
+            <span class="text-base-content/60">GET /api/v1/books/:id/toc</span>
+            <span class="text-primary font-bold">TOC Tree</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-base-200/50 flex justify-between">
+            <span class="text-base-content/60">GET /api/v1/telemetry/stats</span>
+            <span class="text-primary font-bold">Live Stats</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5: Maintainer, Open Science & Contact -->
+    <section class="bg-primary/5 border border-primary/20 rounded-2xl p-6 text-center space-y-4">
+      <h3 class="font-bold text-lg text-base-content">
+        {isAr ? 'مشروع علمي مفتوح المصدر للتراث الإسلامي' : isId ? 'Proyek Sains Terbuka untuk Warisan Islam' : 'Open-Source Scholarly Platform for Islamic Heritage'}
+      </h3>
+      <p class="text-xs text-base-content/70 max-w-lg mx-auto leading-relaxed">
+        {isAr
+          ? 'المشروع مفتوح المصدر للأكاديميين والباحثين والمطورين لخدمة ونشر وتوثيق التراث الإسلامي بالتقنيات الحديثة.'
+          : isId
+          ? 'Proyek ini bersifat open-source untuk peneliti, akademisi, dan pengembang dalam memajukan khazanah Islam.'
+          : 'Open-source research platform welcoming contributions from scholars, researchers, and engineers.'
+        }
+      </p>
+
+      <!-- Maintainer Contact Card -->
+      <div class="p-3.5 rounded-xl bg-base-100 border border-base-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs max-w-md mx-auto">
+        <div class="text-start space-y-0.5">
+          <span class="font-bold text-base-content block">Harridi Ilman Tovid</span>
+          <span class="text-base-content/60 font-mono text-[11px]">+62 811-1729-896</span>
+        </div>
+        <a 
+          href="https://wa.me/628111729896" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="btn btn-success btn-xs text-white font-bold gap-1 rounded-lg shadow-xs"
+          title="Chat on WhatsApp: Harridi Ilman Tovid"
+        >
+          <span>💬 WhatsApp</span>
+        </a>
+      </div>
+
+      <div class="pt-2 flex flex-wrap items-center justify-center gap-3">
+        <a 
+          href="https://github.com/decaller/OpenBayanNext" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="btn btn-primary btn-sm rounded-xl gap-2 font-bold shadow-sm"
+        >
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+          </svg>
+          <span>decaller/OpenBayanNext</span>
+        </a>
+        <a 
+          href="https://wa.me/628111729896" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="btn btn-outline btn-sm rounded-xl gap-2 font-bold"
+        >
+          <span>💬 WhatsApp (+628111729896)</span>
+        </a>
+      </div>
+    </section>
+
+  </div>
+</BaseLayout>
