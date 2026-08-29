@@ -25,15 +25,23 @@ interface SearchControlsProps {
   lang?: SupportedLanguage;
 }
 
-const THEMES = [
-  { id: 'emerald', name: 'Emerald', labelAr: 'زمردي', icon: '🌿' },
-  { id: 'retro', name: 'Retro', labelAr: 'مخطوطة', icon: '📜' },
-  { id: 'light', name: 'Light', labelAr: 'فاتح', icon: '☀️' },
-  { id: 'dark', name: 'Dark', labelAr: 'داكن', icon: '🌙' },
-  { id: 'night', name: 'Night', labelAr: 'ليلي', icon: '🌌' },
-  { id: 'corporate', name: 'Corporate', labelAr: 'أكاديمي', icon: '🏛️' },
-  { id: 'winter', name: 'Winter', labelAr: 'شتوي', icon: '❄️' },
-  { id: 'coffee', name: 'Coffee', labelAr: 'قهوة', icon: '☕' },
+interface ThemeItem {
+  id: string;
+  name: string;
+  labelAr: string;
+  icon: string;
+  colors: [string, string, string, string]; // [primary, secondary, accent, base]
+}
+
+const THEMES: ThemeItem[] = [
+  { id: 'emerald', name: 'Emerald', labelAr: 'زمردي', icon: '🌿', colors: ['#66cc8a', '#377cfb', '#ea5234', '#333c4d'] },
+  { id: 'retro', name: 'Retro', labelAr: 'مخطوطة', icon: '📜', colors: ['#ef9995', '#a4cbb4', '#ebdc99', '#7d5345'] },
+  { id: 'light', name: 'Light', labelAr: 'فاتح', icon: '☀️', colors: ['#491b9d', '#ff4088', '#00cdb8', '#1f2937'] },
+  { id: 'dark', name: 'Dark', labelAr: 'داكن', icon: '🌙', colors: ['#7582ff', '#ff71cf', '#00cdb5', '#a6adbb'] },
+  { id: 'night', name: 'Night', labelAr: 'ليلي', icon: '🌌', colors: ['#38bdf8', '#818cf8', '#f471b5', '#94a3b8'] },
+  { id: 'corporate', name: 'Corporate', labelAr: 'أكاديمي', icon: '🏛️', colors: ['#4b6bfb', '#7b92b2', '#67cba0', '#2b3440'] },
+  { id: 'winter', name: 'Winter', labelAr: 'شتوي', icon: '❄️', colors: ['#047aff', '#463aa2', '#c148ac', '#394e6a'] },
+  { id: 'coffee', name: 'Coffee', labelAr: 'قهوة', icon: '☕', colors: ['#db924b', '#263e3f', '#10576d', '#c59f60'] },
 ];
 
 const LANGUAGES: { code: SupportedLanguage; label: string; flag: string }[] = [
@@ -76,6 +84,17 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
       setCurrentTheme(savedTheme);
       document.documentElement.setAttribute('data-theme', savedTheme);
     } catch (e) {}
+
+    const handleThemeSync = (e: any) => {
+      if (e.detail && e.detail !== currentTheme) {
+        setCurrentTheme(e.detail);
+      }
+    };
+
+    window.addEventListener('openbayan:theme-change', handleThemeSync);
+    return () => {
+      window.removeEventListener('openbayan:theme-change', handleThemeSync);
+    };
   }, []);
 
   const toggleOpen = () => {
@@ -92,6 +111,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
     try {
       localStorage.setItem('openbayan_theme', themeId);
     } catch (e) {}
+    window.dispatchEvent(new CustomEvent('openbayan:theme-change', { detail: themeId }));
   };
 
   const fontOptions: { id: FontSizeOption; label: string }[] = [
@@ -116,7 +136,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
         title={isOpen ? 'Collapse' : 'Expand'}
       >
         <div className="flex items-center gap-1.5">
-          <svg className="w-4 h-4 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
           </svg>
           <span>{t.displayControlsTitle}</span>
@@ -134,11 +154,11 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
       {isOpen && (
         <div className="space-y-3.5 pt-2 border-t border-base-200/60">
           
-          {/* 1. Theme Controller Grid */}
+          {/* 1. Enhanced Theme Controller Grid with Color Swatches */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-base-content/70 font-semibold flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                 </svg>
                 <span>السمة / Theme</span>
@@ -148,7 +168,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
               </span>
             </div>
             
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-2 gap-1.5">
               {THEMES.map((th) => {
                 const isSelected = currentTheme === th.id;
                 return (
@@ -156,15 +176,28 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
                     key={th.id}
                     type="button"
                     onClick={() => handleThemeChange(th.id)}
-                    className={`btn btn-xs rounded-lg transition-all flex flex-col h-auto py-1 px-0.5 gap-0.5 border ${
+                    className={`btn btn-xs rounded-xl transition-all flex items-center justify-between h-auto py-1.5 px-2 border ${
                       isSelected
-                        ? 'btn-primary font-bold shadow-xs'
-                        : 'bg-base-200/80 hover:bg-base-200 text-base-content/80 border-base-200'
+                        ? 'border-primary ring-2 ring-primary/40 bg-primary/10 text-primary font-bold shadow-xs'
+                        : 'bg-base-200/60 hover:bg-base-200 text-base-content/80 border-base-200/80'
                     }`}
-                    title={th.labelAr}
+                    title={`${th.name} (${th.labelAr})`}
                   >
-                    <span className="text-xs leading-none">{th.icon}</span>
-                    <span className="text-[9px] truncate w-full">{th.name}</span>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-xs leading-none">{th.icon}</span>
+                      <span className="text-[10px] truncate font-medium">{th.name}</span>
+                    </div>
+
+                    {/* Color Swatch Dots */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {th.colors.map((c, i) => (
+                        <span 
+                          key={i} 
+                          className="w-2 h-2 rounded-full border border-black/10" 
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
                   </button>
                 );
               })}
@@ -175,7 +208,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
           <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
             <div className="flex items-center justify-between">
               <span className="text-base-content/70 font-semibold flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                 </svg>
                 <span>اللغة / Language</span>
@@ -208,7 +241,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
           <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
             <div className="flex items-center justify-between">
               <span className="text-base-content/70 font-semibold flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
                 </svg>
                 <span>{t.fontFamilyLabel}</span>
@@ -276,7 +309,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
           <div className="space-y-1.5 pt-1.5 border-t border-base-200/50">
             <div className="flex items-center justify-between">
               <span className="text-base-content/70 font-semibold">{t.depthLevelLabel}</span>
-              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+              <span className="text-[10px] font-mono text-primary font-bold">
                 {contextDepth === 1 ? 'Atomic' : 'Discourse ±1'}
               </span>
             </div>
@@ -307,7 +340,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
                 onClick={toggleHighlights}
                 className={`btn btn-xs rounded-lg transition-colors w-full gap-1 ${
                   showHighlights 
-                    ? 'btn-success bg-emerald-700 text-white border-0 hover:bg-emerald-800' 
+                    ? 'btn-primary font-bold shadow-xs' 
                     : 'btn-outline btn-neutral opacity-60'
                 }`}
               >
@@ -331,7 +364,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
                 onClick={toggleCompactView}
                 className={`btn btn-xs rounded-lg transition-colors w-full ${
                   isCompact 
-                    ? 'btn-active bg-stone-800 text-white font-bold' 
+                    ? 'btn-primary font-bold' 
                     : 'btn-ghost border border-base-300'
                 }`}
               >
@@ -345,3 +378,4 @@ export const SearchControls: React.FC<SearchControlsProps> = ({ lang: initialLan
     </div>
   );
 };
+

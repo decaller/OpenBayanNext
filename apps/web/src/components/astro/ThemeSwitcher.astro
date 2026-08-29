@@ -25,7 +25,7 @@ const themes = [
     title="Change Theme (تغيير السمة)"
   >
     <!-- Palette Icon -->
-    <svg class="w-4 h-4 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
     </svg>
     <span class="hidden sm:inline text-xs font-semibold" id="current-theme-label">Theme</span>
@@ -67,19 +67,20 @@ const themes = [
     const THEME_KEY = 'openbayan_theme';
     const savedTheme = localStorage.getItem(THEME_KEY) || 'emerald';
 
-    // 1. Sync active radio input
-    const targetRadio = document.querySelector(`input[name="theme-dropdown"][value="${savedTheme}"]`) as HTMLInputElement | null;
-    if (targetRadio) {
-      targetRadio.checked = true;
-    }
+    const syncThemeUI = (themeName: string) => {
+      const targetRadio = document.querySelector(`input[name="theme-dropdown"][value="${themeName}"]`) as HTMLInputElement | null;
+      if (targetRadio) {
+        targetRadio.checked = true;
+      }
+      const labelEl = document.getElementById('current-theme-label');
+      if (labelEl && targetRadio) {
+        labelEl.textContent = targetRadio.dataset.themeName || 'Theme';
+      }
+    };
 
-    // 2. Sync theme label in button if desired
-    const labelEl = document.getElementById('current-theme-label');
-    if (labelEl && targetRadio) {
-      labelEl.textContent = targetRadio.dataset.themeName || 'Theme';
-    }
+    syncThemeUI(savedTheme);
 
-    // 3. Listen for theme selection
+    // Listen for theme selection from header dropdown
     document.querySelectorAll('input[name="theme-dropdown"].theme-controller').forEach((input) => {
       input.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
@@ -87,11 +88,17 @@ const themes = [
           const newTheme = target.value;
           document.documentElement.setAttribute('data-theme', newTheme);
           localStorage.setItem(THEME_KEY, newTheme);
-          if (labelEl) {
-            labelEl.textContent = target.dataset.themeName || 'Theme';
-          }
+          syncThemeUI(newTheme);
+          window.dispatchEvent(new CustomEvent('openbayan:theme-change', { detail: newTheme }));
         }
       });
+    });
+
+    // Listen for theme selection from other components (like SearchControls sidebar)
+    window.addEventListener('openbayan:theme-change', (e: any) => {
+      if (e.detail) {
+        syncThemeUI(e.detail);
+      }
     });
   }
 
@@ -99,3 +106,4 @@ const themes = [
   setupThemeController();
   document.addEventListener('astro:page-load', setupThemeController);
 </script>
+

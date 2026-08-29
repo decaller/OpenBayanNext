@@ -1,7 +1,7 @@
 ---
 import type { SearchResultItem } from '../../lib/api';
 import { translations, type SupportedLanguage } from '../../lib/i18n';
-import { highlightQueryTerms } from '../../lib/highlighter';
+import { highlightQueryTerms, sanitizeSnippetText } from '../../lib/highlighter';
 
 interface Props {
   chunk: SearchResultItem;
@@ -13,18 +13,16 @@ interface Props {
 const { chunk, rankIndex, lang = 'ar', searchQuery = '' } = Astro.props;
 const t = translations[lang];
 
-// Strip existing internal title tags
-const rawSnippet = chunk.text_snippet
-  .replace(/<span data-type=['"]title['"].*?>.*?<\/span>/g, '')
-  .trim();
+// Clean internal metadata tags and normalize text
+const rawSnippet = sanitizeSnippetText(chunk.text_snippet);
 
 // Apply visual highlight to search terms
 const highlightedSnippet = highlightQueryTerms(rawSnippet, searchQuery);
 const highlightedPreceding = chunk.preceding_text 
-  ? highlightQueryTerms(chunk.preceding_text.slice(0, 260) + '...', searchQuery)
+  ? highlightQueryTerms(sanitizeSnippetText(chunk.preceding_text).slice(0, 260) + '...', searchQuery)
   : null;
 const highlightedSucceeding = chunk.succeeding_text 
-  ? highlightQueryTerms(chunk.succeeding_text.slice(0, 260) + '...', searchQuery)
+  ? highlightQueryTerms(sanitizeSnippetText(chunk.succeeding_text).slice(0, 260) + '...', searchQuery)
   : null;
 
 // Tradition label formatter
@@ -40,7 +38,7 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
 ---
 
 <article 
-  class="card bg-base-100 border border-base-200/90 hover:border-emerald-700/40 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden mb-4 group"
+  class="card bg-base-100 border border-base-200 hover:border-primary/40 hover:shadow-md transition-all duration-200 rounded-2xl overflow-visible mb-4 group"
   id={`chunk-${chunk.chunk_id}`}
 >
   <div class="card-body p-5 sm:p-6 space-y-3">
@@ -52,7 +50,7 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
             #{rankIndex}
           </span>
         )}
-        <span class="font-bold text-sm text-emerald-800 dark:text-emerald-400">
+        <span class="font-bold text-sm text-primary">
           {chunk.book_name}
         </span>
         <span class="badge badge-sm badge-ghost font-mono">
@@ -60,24 +58,87 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
         </span>
         
         {chunk.is_section_start && (
-          <span class="badge badge-xs bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 font-bold gap-1 text-[10px]">
+          <span class="badge badge-xs badge-warning badge-outline font-semibold gap-1 text-[10px]">
             <span>📖</span>
             <span>{t.sectionStartBadge}</span>
           </span>
         )}
 
         {chunk.is_merged && (
-          <span class="badge badge-xs badge-success badge-outline">
+          <span class="badge badge-xs badge-info badge-outline text-[10px]">
             {t.consecutivePages}
           </span>
         )}
+
+        <!-- Metadata Popover Details Dropdown -->
+        <div class="dropdown dropdown-hover dropdown-end inline-block">
+          <label 
+            tabindex="0" 
+            class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary gap-1 px-1.5 h-6 min-h-0 rounded-md cursor-pointer"
+            title="بيانات وتفاصيل المصدر / Source Details"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="text-[11px] hidden sm:inline">{lang === 'ar' ? 'المصدر' : 'Source'}</span>
+          </label>
+          <div 
+            tabindex="0" 
+            class="dropdown-content z-30 p-3 shadow-xl bg-base-100 border border-base-300 rounded-xl w-72 text-xs space-y-2.5 mt-1 font-sans text-base-content"
+          >
+            <div class="font-bold text-xs pb-1 border-b border-base-200 flex items-center justify-between text-primary">
+              <span>{chunk.book_name}</span>
+              <span class="font-mono text-[10px] text-base-content/60">{chunk.volume_page}</span>
+            </div>
+            
+            {chunk.author_name && (
+              <div class="text-[11px] space-y-0.5">
+                <span class="text-base-content/60 block">{lang === 'ar' ? 'المؤلف' : 'Author'}:</span>
+                <span class="font-semibold text-base-content/90">
+                  {chunk.author_name} {chunk.author_death_hijri && `(ت: ${chunk.author_death_hijri} هـ)`}
+                </span>
+              </div>
+            )}
+
+            <div class="flex items-center gap-1.5 flex-wrap pt-1">
+              {chunk.category_name && (
+                <span class="badge badge-xs badge-ghost text-[10px]">{chunk.category_name}</span>
+              )}
+              {traditionLabel && (
+                <span class="badge badge-xs badge-outline badge-primary text-[10px]">{traditionLabel}</span>
+              )}
+            </div>
+
+            <div class="text-[11px] text-base-content/60 pt-1 border-t border-base-200">
+              <span class="block mb-1 font-semibold">{lang === 'ar' ? 'المكتبات الرقمية' : 'Digital Editions'}:</span>
+              <div class="flex items-center gap-1.5">
+                <a 
+                  href={turathUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  class="badge badge-sm badge-outline hover:badge-primary text-[10px] gap-1 transition-colors"
+                >
+                  <span>{t.turathLink} ↗</span>
+                </a>
+                <a 
+                  href={shamelaUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  class="badge badge-sm badge-outline hover:badge-primary text-[10px] gap-1 transition-colors"
+                >
+                  <span>{t.shamelaLink} ↗</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Right: Drawer Quick-Open Button -->
       <div class="flex items-center gap-1.5">
         <button
           type="button"
-          class="btn btn-ghost btn-xs text-emerald-700 hover:text-emerald-900 font-bold gap-1"
+          class="btn btn-ghost btn-xs text-primary hover:bg-primary/10 font-bold gap-1"
           data-open-drawer
           data-book-id={chunk.book_id}
           data-section-id={chunk.section_id}
@@ -88,6 +149,9 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
           data-volume-page={chunk.volume_page}
           title={t.exploreInSidebar}
         >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
           <span>{t.exploreInSidebar}</span>
         </button>
       </div>
@@ -95,7 +159,7 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
 
     <!-- Breadcrumb Hierarchy -->
     <div class="text-xs font-sans text-base-content/65 flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">
-      <svg class="w-3.5 h-3.5 flex-shrink-0 text-emerald-700/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-3.5 h-3.5 flex-shrink-0 text-primary/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
       <span class="truncate">{chunk.breadcrumb}</span>
@@ -122,9 +186,6 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
             <span class="flex items-center gap-1">
               <span>◀</span>
               <span>{t.precedingDiscourse}</span>
-            </span>
-            <span class="text-emerald-700 hover:underline flex items-center gap-0.5 text-[11px]">
-              <span>{t.exploreInSidebar}</span>
             </span>
           </div>
           <div class="arabic-matn text-sm sm:text-base text-base-content/75 leading-relaxed pt-0.5" dir="rtl" set:html={highlightedPreceding} />
@@ -164,9 +225,6 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
               <span>▶</span>
               <span>{t.succeedingDiscourse}</span>
             </span>
-            <span class="text-emerald-700 hover:underline flex items-center gap-0.5 text-[11px]">
-              <span>{t.exploreInSidebar}</span>
-            </span>
           </div>
           <div class="arabic-matn text-sm sm:text-base text-base-content/75 leading-relaxed pt-0.5" dir="rtl" set:html={highlightedSucceeding} />
         </div>
@@ -178,41 +236,21 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
     {chunk.footnotes && (
       <div class="mt-2 pt-2 border-t border-dashed border-base-200 text-xs font-sans text-base-content/60 leading-relaxed bg-base-200/20 rounded-lg p-2.5" dir="rtl">
         <span class="font-bold text-base-content/70">{t.footnotesTitle} </span>
-        <span>{chunk.footnotes.slice(0, 160)}...</span>
+        <span>{sanitizeSnippetText(chunk.footnotes).slice(0, 160)}...</span>
       </div>
     )}
 
     <!-- Bottom Actions Bar: External Editions, Copy for AI & Permalink -->
     <div class="flex flex-wrap items-center justify-between pt-3 mt-1 border-t border-base-200/60 font-sans gap-2">
-      <!-- Left: External Library Badges & Author -->
-      <div class="flex items-center gap-1.5 flex-wrap text-xs">
+      <!-- Left: Scholarly Attribution Breadcrumb -->
+      <div class="flex items-center gap-1.5 flex-wrap text-xs text-base-content/70">
         {chunk.author_name && (
-          <span class="text-[11px] text-base-content/70 me-1">
+          <span class="text-[11px]">
             <strong>{chunk.author_name}</strong> {chunk.author_death_hijri && `(ت: ${chunk.author_death_hijri} هـ)`}
-            {chunk.category_name && <span class="badge badge-xs badge-ghost ms-1">{chunk.category_name}</span>}
-            {traditionLabel && <span class="badge badge-xs badge-outline ms-1 text-emerald-800 dark:text-emerald-400">{traditionLabel}</span>}
-            •
           </span>
         )}
-        <span class="text-[11px] text-base-content/50 hidden sm:inline">{t.onlineBook}</span>
-        <a 
-          href={turathUrl} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          class="badge badge-sm badge-outline hover:badge-primary text-[11px] gap-1 transition-colors"
-          title="Open Book on Turath.io"
-        >
-          <span>{t.turathLink}</span>
-        </a>
-        <a 
-          href={shamelaUrl} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          class="badge badge-sm badge-outline hover:badge-primary text-[11px] gap-1 transition-colors"
-          title="Open Book on Shamela.ws"
-        >
-          <span>{t.shamelaLink}</span>
-        </a>
+        <span class="text-base-content/40">•</span>
+        <span class="font-mono text-[11px] text-base-content/60">{chunk.volume_page}</span>
       </div>
 
       <!-- Right: Copy for AI & Permalink Link -->
@@ -220,7 +258,7 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
         <!-- Copy for AI Button -->
         <button
           type="button"
-          class="btn btn-ghost btn-xs text-base-content/70 hover:text-emerald-800 gap-1"
+          class="btn btn-ghost btn-xs text-base-content/70 hover:text-primary gap-1"
           data-copy-ai
           data-chunk-id={chunk.chunk_id}
           data-book-name={chunk.book_name}
@@ -230,11 +268,11 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
           data-author-tradition={chunk.author_tradition || ''}
           data-volume-page={chunk.volume_page}
           data-breadcrumb={chunk.breadcrumb}
-          data-raw-text={chunk.full_text || rawSnippet}
-          data-footnotes={chunk.footnotes || ''}
+          data-raw-text={sanitizeSnippetText(chunk.full_text || rawSnippet)}
+          data-footnotes={chunk.footnotes ? sanitizeSnippetText(chunk.footnotes) : ''}
           title={t.copyForAI}
         >
-          <svg class="w-3.5 h-3.5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
           <span class="hidden sm:inline">{t.copyForAI}</span>
@@ -243,7 +281,7 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
         <!-- Permalink Link -->
         <a 
           href={`/p/${chunk.chunk_id}?lang=${lang}`} 
-          class="btn btn-ghost btn-xs text-base-content/70 hover:text-emerald-700 gap-1"
+          class="btn btn-ghost btn-xs text-base-content/70 hover:text-primary gap-1"
           title={t.permalink}
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,3 +293,4 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
     </div>
   </div>
 </article>
+

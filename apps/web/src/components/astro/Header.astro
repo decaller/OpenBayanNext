@@ -21,7 +21,7 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
     <!-- Brand Logo & Title (Centering by default, sliding to start on scroll) -->
     <div id="navbar-brand-wrapper" class="flex items-center gap-3 transition-all duration-300 ease-out navbar-logo-centered z-10">
       <a href={`/?lang=${currentLang}`} class="flex items-center gap-3 group">
-        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary text-primary-content flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
           <span class="font-serif text-xl sm:text-2xl font-bold">ب</span>
         </div>
         <div class="flex flex-col text-start">
@@ -47,7 +47,7 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
             name="q"
             value={query}
             placeholder={t.searchPlaceholder}
-            class="input input-sm w-full bg-base-200/90 focus:bg-base-100 rounded-xl border border-base-300 focus:border-emerald-700 text-xs font-sans ps-8 pe-8 text-base-content transition-all shadow-xs"
+            class="input input-sm w-full bg-base-200/90 focus:bg-base-100 rounded-xl border border-base-300 focus:border-primary text-xs font-sans ps-8 pe-8 text-base-content transition-all shadow-xs"
           />
           <!-- Leading Search Icon -->
           <div class="absolute start-2.5 top-1/2 -translate-y-1/2 text-base-content/50 pointer-events-none">
@@ -58,7 +58,7 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
           <!-- Submit Button -->
           <button 
             type="submit" 
-            class="absolute end-1.5 top-1/2 -translate-y-1/2 btn btn-xs btn-circle btn-ghost text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-950"
+            class="absolute end-1.5 top-1/2 -translate-y-1/2 btn btn-xs btn-circle btn-ghost text-primary hover:bg-primary/10"
             title={t.searchBtn}
           >
             <svg class="w-3.5 h-3.5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,6 +68,7 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
         </div>
       </form>
     </div>
+
 
   </div>
 </header>

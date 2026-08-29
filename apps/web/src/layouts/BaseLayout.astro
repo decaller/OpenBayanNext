@@ -56,12 +56,13 @@ const {
       <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     )}
   </head>
-  <body class="min-h-screen flex flex-col antialiased bg-base-100 text-base-content selection:bg-emerald-200 selection:text-emerald-900">
+  <body class="min-h-screen flex flex-col antialiased bg-base-100 text-base-content selection:bg-primary/20 selection:text-primary">
     <Header lang={currentLang} />
     
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:py-8">
       <slot />
     </main>
+
 
     <Footer lang={currentLang} />
 

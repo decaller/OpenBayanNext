@@ -58,3 +58,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Audit Artifacts
+audit/screenshots/
+

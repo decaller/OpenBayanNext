@@ -6,6 +6,7 @@ import {
   type SurroundingContextResponse 
 } from '../../lib/api';
 import { translations, getLangFromUrl } from '../../lib/i18n';
+import { sanitizeSnippetText } from '../../lib/highlighter';
 
 const currentLang = getLangFromUrl(Astro.url);
 const t = translations[currentLang];
@@ -45,6 +46,9 @@ if (!chunk && !error) {
   return Astro.redirect('/404');
 }
 
+const cleanRawText = chunk ? sanitizeSnippetText(chunk.raw_text) : '';
+const cleanFootnotes = chunk && chunk.footnotes ? sanitizeSnippetText(chunk.footnotes) : '';
+
 // Generate Schema.org JSON-LD metadata for search engine indexing
 const jsonLd = chunk ? {
   "@context": "https://schema.org",
@@ -61,7 +65,7 @@ const jsonLd = chunk ? {
     "inLanguage": "ar"
   },
   "pageStart": chunk.volume_page,
-  "articleBody": chunk.raw_text,
+  "articleBody": cleanRawText,
   "inLanguage": "ar"
 } : undefined;
 
@@ -75,7 +79,7 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
 
 <BaseLayout 
   title={pageTitle} 
-  description={chunk?.raw_text.slice(0, 160)}
+  description={cleanRawText.slice(0, 160)}
   jsonLd={jsonLd}
   lang={currentLang}
 >
@@ -87,15 +91,15 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
     <div class="max-w-4xl mx-auto space-y-8 py-4">
       <!-- Breadcrumb Navigation -->
       <nav class="flex items-center gap-2 text-xs font-sans text-base-content/60 overflow-x-auto pb-2">
-        <a href={`/?lang=${currentLang}`} class="hover:text-emerald-700">{t.appName}</a>
+        <a href={`/?lang=${currentLang}`} class="hover:text-primary">{t.appName}</a>
         <span>/</span>
-        <a href={`/search?q=${encodeURIComponent(chunk.book_name)}&lang=${currentLang}`} class="hover:text-emerald-700">{chunk.book_name}</a>
+        <a href={`/search?q=${encodeURIComponent(chunk.book_name)}&lang=${currentLang}`} class="hover:text-primary">{chunk.book_name}</a>
         <span>/</span>
         <span class="text-base-content/90 font-medium truncate">{chunk.section_title}</span>
       </nav>
 
       <!-- Main Scholarly Article Card (0-JS Pure Semantic HTML) -->
-      <article class="bg-base-100 border border-base-200/90 rounded-3xl p-6 sm:p-10 shadow-xs space-y-6">
+      <article class="bg-base-100 border border-base-200 rounded-3xl p-6 sm:p-10 shadow-xs space-y-6">
         <!-- Bibliographic Header -->
         <header class="border-b border-base-200 pb-6">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-2 font-sans">
@@ -121,7 +125,7 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
             <span>المؤلف: <strong>{chunk.author_name}</strong> (ت: {chunk.author_death_hijri} هـ)</span>
           </div>
 
-          <h1 class="text-2xl sm:text-3xl font-bold font-sans text-emerald-950 dark:text-emerald-300 leading-snug mt-3">
+          <h1 class="text-2xl sm:text-3xl font-bold font-sans text-base-content leading-snug mt-3">
             {chunk.section_title}
           </h1>
           <p class="text-xs text-base-content/60 font-sans mt-1">
@@ -131,14 +135,14 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
 
         <!-- Classical Text Body (Amiri Font, Line Height 2.3) -->
         <div class="arabic-matn text-lg sm:text-xl text-base-content/90 leading-loose py-2" dir="rtl">
-          {chunk.raw_text}
+          {cleanRawText}
         </div>
 
         <!-- Footnotes Section if present -->
-        {chunk.footnotes && (
+        {cleanFootnotes && (
           <footer class="mt-8 pt-6 border-t border-dashed border-base-300 font-sans text-xs sm:text-sm text-base-content/70 space-y-2 bg-base-200/20 p-4 rounded-xl" dir="rtl">
             <h4 class="font-bold text-base-content/90 text-xs">{t.footnotesTitle}</h4>
-            <p class="leading-relaxed whitespace-pre-line">{chunk.footnotes}</p>
+            <p class="leading-relaxed whitespace-pre-line">{cleanFootnotes}</p>
           </footer>
         )}
 
@@ -147,16 +151,16 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
           <!-- Copy for AI Button -->
           <button
             type="button"
-            class="btn btn-sm btn-ghost text-base-content/70 hover:text-emerald-800 gap-1.5"
+            class="btn btn-sm btn-ghost text-base-content/70 hover:text-primary gap-1.5"
             data-copy-ai
             data-chunk-id={chunk.chunk_id}
             data-book-name={chunk.book_name}
             data-volume-page={chunk.volume_page}
             data-breadcrumb={chunk.breadcrumb}
-            data-raw-text={chunk.raw_text}
-            data-footnotes={chunk.footnotes || ''}
+            data-raw-text={cleanRawText}
+            data-footnotes={cleanFootnotes}
           >
-            <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
             <span>{t.copyForAI}</span>
@@ -165,7 +169,7 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
           <!-- Drawer Trigger -->
           <button 
             type="button"
-            class="btn btn-sm btn-outline btn-success hover:!bg-emerald-800 hover:!text-white gap-2 font-bold"
+            class="btn btn-sm btn-primary gap-2 font-bold"
             data-open-drawer
             data-book-id={chunk.book_id}
             data-section-id={chunk.section_id}
@@ -192,16 +196,17 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
           <div class="space-y-3">
             {surrounding.items.map((item) => {
               const isCurrent = item.chunk_id === chunkId;
+              const itemCleanText = sanitizeSnippetText(item.raw_text);
               return (
                 <div 
                   class={`p-5 rounded-2xl border transition-all ${
                     isCurrent 
-                      ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-700/40 shadow-xs' 
-                      : 'bg-base-100/70 border-base-200/80'
+                      ? 'bg-primary/10 border-primary/50 shadow-xs' 
+                      : 'bg-base-100 border-base-200'
                   }`}
                 >
                   <div class="flex items-center justify-between text-xs font-mono text-base-content/50 mb-2 pb-1 border-b border-base-200/40 font-sans">
-                    <span class="font-bold text-emerald-800 dark:text-emerald-400 font-mono">
+                    <span class="font-bold text-primary font-mono">
                       {item.volume_page} {isCurrent && '(الموضع الحالي)'}
                     </span>
                     {!item.is_same_section && (
@@ -212,12 +217,12 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
                   </div>
 
                   <div class="arabic-matn text-base sm:text-lg text-base-content/80 leading-relaxed" dir="rtl">
-                    {item.raw_text.slice(0, 250)}...
+                    {itemCleanText.slice(0, 250)}...
                   </div>
 
                   {!isCurrent && (
                     <div class="mt-2 text-start">
-                      <a href={`/p/${item.chunk_id}?lang=${currentLang}`} class="btn btn-ghost btn-xs text-emerald-800 text-[11px] font-sans">
+                      <a href={`/p/${item.chunk_id}?lang=${currentLang}`} class="btn btn-ghost btn-xs text-primary text-[11px] font-sans">
                         انتقل إلى هذا الموضع ←
                       </a>
                     </div>
@@ -231,3 +236,4 @@ const shamelaUrl = chunk ? `https://shamela.ws/book/${chunk.book_id}` : '#';
     </div>
   )}
 </BaseLayout>
+

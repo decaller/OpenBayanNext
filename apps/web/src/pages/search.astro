@@ -106,6 +106,26 @@ const hasActiveFilters = Boolean(category || era || tradition);
       </div>
     )}
 
+    <!-- Mobile Quick Navigation Bar (< 1024px) -->
+    {query && searchData && searchData.results.length > 0 && (
+      <div class="lg:hidden flex items-center justify-between gap-2 p-3 bg-base-100 border border-base-200 rounded-2xl shadow-xs font-sans text-xs">
+        <span class="font-bold text-base-content/80 truncate">
+          {searchData.results.length} {t.passages} ({clusters.length} {t.sectionsCount})
+        </span>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <a href="#sidebar-card-facets" class="btn btn-xs btn-outline btn-primary gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            <span>{currentLang === 'en' ? 'Filters' : currentLang === 'id' ? 'Filter' : 'المرشحات'}</span>
+          </a>
+          <a href="#sidebar-controls-section" class="btn btn-xs btn-ghost text-base-content/70">
+            <span>⚙️ {currentLang === 'en' ? 'Settings' : currentLang === 'id' ? 'Pengaturan' : 'العرض'}</span>
+          </a>
+        </div>
+      </div>
+    )}
+
     <!-- Main Grid: 8 Cols (Thematic Groups) + 4 Cols (Sticky Floating Sidebar) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
       
@@ -116,32 +136,32 @@ const hasActiveFilters = Boolean(category || era || tradition);
         <!-- SCRIPTURE CITATION DIRECT INTERCEPTOR PINNED CARD -->
         <!-- ======================================================== -->
         {searchData?.pinned_citation && (
-          <div class="bg-gradient-to-r from-emerald-900 to-teal-950 text-white p-5 rounded-2xl shadow-md border border-emerald-700/60 font-sans space-y-3">
+          <div class="bg-neutral text-neutral-content p-5 rounded-2xl shadow-md border border-neutral-content/20 font-sans space-y-3">
             <div class="flex items-center justify-between text-xs">
               <div class="flex items-center gap-2">
                 <span class="badge badge-warning font-bold text-xs">
                   {t.scriptureCitationPinned.split(':')[0]}
                 </span>
-                <span class="font-bold text-emerald-200">
+                <span class="font-bold text-neutral-content">
                   {searchData.pinned_citation.citation.display_title}
                 </span>
               </div>
-              <span class="text-emerald-300/80 font-mono text-[11px]">
+              <span class="text-neutral-content/80 font-mono text-[11px]">
                 {searchData.pinned_citation.book_name} ({searchData.pinned_citation.volume_page})
               </span>
             </div>
 
-            <div class="arabic-matn text-emerald-50 text-base leading-loose p-3 bg-black/20 rounded-xl border border-emerald-500/20" dir="rtl">
+            <div class="arabic-matn text-neutral-content text-base leading-loose p-3 bg-black/20 rounded-xl border border-neutral-content/15" dir="rtl">
               {searchData.pinned_citation.raw_text.slice(0, 380)}...
             </div>
 
-            <div class="flex items-center justify-between pt-1 text-[11px] text-emerald-300">
+            <div class="flex items-center justify-between pt-1 text-[11px] text-neutral-content/80">
               <span class="truncate">
                 {searchData.pinned_citation.breadcrumb}
               </span>
               <button
                 type="button"
-                class="btn btn-xs bg-emerald-700 hover:bg-emerald-600 text-white font-bold border-0"
+                class="btn btn-xs btn-primary font-bold"
                 data-open-drawer
                 data-book-id={searchData.pinned_citation.book_id}
                 data-chunk-id={searchData.pinned_citation.chunk_id}
@@ -163,9 +183,9 @@ const hasActiveFilters = Boolean(category || era || tradition);
 
           return (
             <section id={cluster.id} class="space-y-4 scroll-mt-24">
-              <!-- Thematic Group Header Banner -->
-              <div class="bg-base-100/90 border-s-4 border-emerald-700 p-5 rounded-2xl border border-base-200 shadow-xs font-sans space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
+              <!-- Thematic Group Header Banner (Responsive for 768px tablet) -->
+              <div class="bg-base-100 border-s-4 border-primary p-5 rounded-2xl border border-base-200 shadow-xs font-sans space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div class="flex items-center gap-2.5">
                     <span class="badge badge-neutral font-bold text-xs">
                       {cluster.clusterIndex}
@@ -175,24 +195,24 @@ const hasActiveFilters = Boolean(category || era || tradition);
                     </h3>
                   </div>
 
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <!-- Thematic Query Sentence Accuracy Badge -->
                     <span 
-                      class="badge badge-sm bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 font-mono font-bold text-[11px] gap-1"
+                      class="badge badge-sm badge-outline badge-primary font-mono font-bold text-[11px] gap-1 flex-shrink-0"
                       title={`${t.matchAccuracy}: ${cluster.accuracy_percentage}%`}
                     >
-                      <svg class="w-3 h-3 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span>{cluster.accuracy_percentage}%</span>
                     </span>
 
                     <!-- Real total passage count found under this theme -->
-                    <span class="badge badge-sm badge-ghost font-mono" title={`${cluster.doc_count} passages found in this theme`}>
+                    <span class="badge badge-sm badge-ghost font-mono flex-shrink-0" title={`${cluster.doc_count} passages found in this theme`}>
                       {cluster.doc_count} {t.passages}
                       {cluster.doc_count > 5 && (
                         <span class="text-[10px] text-base-content/50 ms-1">
-                          ({currentLang === 'en' ? 'showing top 5' : currentLang === 'id' ? 'tampil 5 teratas' : 'عُرضت ٥'})
+                          ({currentLang === 'en' ? 'top 5' : currentLang === 'id' ? '5 teratas' : '٥ مختارة'})
                         </span>
                       )}
                     </span>
@@ -200,10 +220,10 @@ const hasActiveFilters = Boolean(category || era || tradition);
                     <!-- Search This Topic Button in Header -->
                     <a
                       href={themeQueryUrl}
-                      class="btn btn-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 font-bold gap-1 transition-all rounded-lg"
+                      class="btn btn-xs btn-outline btn-primary font-bold gap-1 transition-all rounded-lg flex-shrink-0"
                       title={t.searchThisTheme}
                     >
-                      <svg class="w-3 h-3 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                       <span>{t.searchThisTheme} ↗</span>
@@ -221,7 +241,7 @@ const hasActiveFilters = Boolean(category || era || tradition);
                     <span class="font-bold text-base-content/70">{t.dominantRoots}</span>
                     <div class="flex gap-1">
                       {cluster.dominant_roots.map(r => (
-                        <span class="badge badge-xs badge-outline font-mono font-bold text-emerald-800 dark:text-emerald-400">
+                        <span class="badge badge-xs badge-outline font-mono font-bold text-primary">
                           {r}
                         </span>
                       ))}
@@ -246,33 +266,49 @@ const hasActiveFilters = Boolean(category || era || tradition);
                   />
                 ))}
               </div>
-
-              <!-- Bottom Action: Deep Dive into This Thematic Topic -->
-              <div class="text-center pt-1 pb-2">
-                <a
-                  href={themeQueryUrl}
-                  class="btn btn-sm btn-outline border-dashed border-base-300 hover:border-emerald-600 text-base-content/70 hover:text-emerald-800 text-xs font-sans rounded-xl gap-1.5 transition-all w-full sm:w-auto"
-                >
-                  <svg class="w-3.5 h-3.5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span>{t.searchThisTheme}: <strong>"{themeQuery}"</strong> ↗</span>
-                </a>
-              </div>
             </section>
           );
         })}
 
-        <!-- Empty State -->
+        <!-- Actionable Empty State with Recovery Buttons -->
         {searchData && searchData.results.length === 0 && !searchData.pinned_citation && (
-          <div class="text-center py-16 bg-base-100/60 rounded-3xl border border-dashed border-base-300 p-8 my-6">
-            <div class="w-12 h-12 rounded-full bg-base-200 text-base-content/40 flex items-center justify-center mx-auto mb-3 text-xl">
+          <div class="text-center py-16 bg-base-100 rounded-3xl border border-dashed border-base-300 p-8 my-6 space-y-4">
+            <div class="w-12 h-12 rounded-full bg-base-200 text-base-content/40 flex items-center justify-center mx-auto text-xl">
               🔍
             </div>
-            <h3 class="text-base font-bold text-base-content mb-1 font-sans">{t.noResultsTitle}</h3>
-            <p class="text-xs text-base-content/60 font-sans max-w-sm mx-auto">
-              {t.noResultsDesc}
-            </p>
+            <div class="space-y-1">
+              <h3 class="text-base font-bold text-base-content font-sans">{t.noResultsTitle}</h3>
+              <p class="text-xs text-base-content/60 font-sans max-w-sm mx-auto">
+                {t.noResultsDesc}
+              </p>
+            </div>
+
+            <!-- Recovery Action CTAs -->
+            <div class="flex flex-wrap items-center justify-center gap-2 pt-2 font-sans">
+              {hasActiveFilters && (
+                <a
+                  href={`/search?q=${encodeURIComponent(query)}&lang=${currentLang}`}
+                  class="btn btn-sm btn-primary font-bold gap-1.5"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{currentLang === 'en' ? 'Reset Filters' : currentLang === 'id' ? 'Reset Filter' : 'إعادة تعيين المرشحات'}</span>
+                </a>
+              )}
+
+              {mode !== 'vector' && (
+                <a
+                  href={`/search?q=${encodeURIComponent(query)}&mode=vector&lang=${currentLang}`}
+                  class="btn btn-sm btn-outline btn-primary font-bold gap-1.5"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>{currentLang === 'en' ? 'Try Semantic AI Search' : currentLang === 'id' ? 'Coba Pencarian Semantik AI' : 'البحث في النمط المعنوي (الذكاء الاصطناعي)'}</span>
+                </a>
+              )}
+            </div>
           </div>
         )}
       </section>
@@ -289,11 +325,11 @@ const hasActiveFilters = Boolean(category || era || tradition);
               <button
                 type="button"
                 data-toggle-collapse="facets"
-                class="flex items-center justify-between w-full font-bold text-base-content hover:text-emerald-800 dark:hover:text-emerald-400 transition-colors text-start focus:outline-none"
+                class="flex items-center justify-between w-full font-bold text-base-content hover:text-primary transition-colors text-start focus:outline-none"
                 title="Toggle Discipline & Tradition Filters"
               >
                 <div class="flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
                   <span>{t.filterByDiscipline.replace(':', '')}</span>
@@ -306,7 +342,7 @@ const hasActiveFilters = Boolean(category || era || tradition);
                   {hasActiveFilters && (
                     <a
                       href={createFacetUrl(Astro.url, { category: null, era: null, tradition: null })}
-                      class="text-[10px] text-rose-600 hover:underline font-bold me-1"
+                      class="text-[10px] text-error hover:underline font-bold me-1"
                       title="Reset all filters"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -335,7 +371,7 @@ const hasActiveFilters = Boolean(category || era || tradition);
                           href={facetUrl}
                           class={`badge badge-sm rounded-lg transition-all text-[11px] ${
                             isSelected
-                              ? 'bg-emerald-800 text-white font-bold shadow-xs'
+                              ? 'badge-primary font-bold shadow-xs'
                               : 'bg-base-200/80 text-base-content/70 hover:bg-base-200 hover:text-base-content border-0'
                           }`}
                         >
@@ -403,12 +439,12 @@ const hasActiveFilters = Boolean(category || era || tradition);
               <button
                 type="button"
                 data-toggle-collapse="thematic"
-                class="flex items-center justify-between w-full font-bold text-base-content hover:text-emerald-800 dark:hover:text-emerald-400 transition-colors text-start focus:outline-none"
+                class="flex items-center justify-between w-full font-bold text-base-content hover:text-primary transition-colors text-start focus:outline-none"
                 title="Toggle Thematic Structure"
               >
                 <div class="flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                   <span>{t.thematicStructure}</span>
                 </div>
@@ -417,7 +453,7 @@ const hasActiveFilters = Boolean(category || era || tradition);
                   <span class="badge badge-xs badge-neutral font-mono">{clusters.length} {t.sectionsCount}</span>
                   <span class="w-5 h-5 flex items-center justify-center rounded-md bg-base-200 text-base-content/60 transition-transform duration-200 chevron-icon rotate-180">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </span>
                 </div>
@@ -431,15 +467,15 @@ const hasActiveFilters = Boolean(category || era || tradition);
                     <a
                       href={`#${cl.id}`}
                       data-smooth-scroll
-                      class="block p-3 rounded-xl border border-base-200/80 hover:border-emerald-600 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-all text-xs group"
+                      class="block p-3 rounded-xl border border-base-200/80 hover:border-primary hover:bg-primary/5 transition-all text-xs group"
                     >
                       <div class="flex items-center justify-between mb-1">
-                        <span class="font-bold text-base-content group-hover:text-emerald-800 dark:group-hover:text-emerald-400">
+                        <span class="font-bold text-base-content group-hover:text-primary">
                           {cl.title}
                         </span>
                         <div class="flex items-center gap-1">
                           <!-- Navigation Item Accuracy Badge -->
-                          <span class="badge badge-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-mono font-bold" title={t.matchAccuracy}>
+                          <span class="badge badge-xs badge-outline badge-primary font-mono font-bold" title={t.matchAccuracy}>
                             {cl.accuracy_percentage}%
                           </span>
                           <span class="badge badge-xs badge-ghost font-mono" title={`${cl.doc_count} passages found`}>
@@ -459,13 +495,13 @@ const hasActiveFilters = Boolean(category || era || tradition);
                   <div class="pt-3 border-t border-base-200/60 space-y-1.5 text-xs text-base-content/70">
                     <div class="flex justify-between">
                       <span class="text-base-content/50">{t.retrievalMode}</span>
-                      <span class="font-bold text-emerald-800 dark:text-emerald-400">
+                      <span class="font-bold text-primary">
                         {mode === 'hybrid' ? t.modeHybrid : mode === 'fts' ? t.modeFts : t.modeVector}
                       </span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-base-content/50">{t.tookTime}</span>
-                      <span class="font-mono text-emerald-700 font-bold">{searchData.took_ms} ms</span>
+                      <span class="font-mono text-primary font-bold">{searchData.took_ms} ms</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-base-content/50">{t.engine}</span>
@@ -478,46 +514,46 @@ const hasActiveFilters = Boolean(category || era || tradition);
           )}
 
           <!-- ======================================================== -->
-          <!-- 3. COLLAPSIBLE AI GROUNDING CARD (Default Open)          -->
+          <!-- 3. COLLAPSIBLE AI GROUNDING CARD (Theme-Adaptive)       -->
           <!-- ======================================================== -->
           {searchData && searchData.results.length > 0 && (
-            <div class="bg-gradient-to-br from-stone-900 to-slate-950 text-white rounded-2xl p-4 shadow-sm border border-stone-800 space-y-3 font-sans text-xs transition-all" id="sidebar-card-ai">
+            <div class="bg-base-100 text-base-content rounded-2xl p-4 shadow-sm border border-base-200 space-y-3 font-sans text-xs transition-all" id="sidebar-card-ai">
               <button
                 type="button"
                 data-toggle-collapse="ai"
-                class="flex items-center justify-between w-full font-bold text-emerald-400 hover:text-emerald-300 transition-colors text-start focus:outline-none"
+                class="flex items-center justify-between w-full font-bold text-primary hover:text-primary/80 transition-colors text-start focus:outline-none"
                 title="Toggle AI Grounding Tools"
               >
                 <div class="flex items-center gap-1.5">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   <span>{t.exploreWithAI}</span>
                 </div>
 
                 <div class="flex items-center gap-1.5">
-                  <span class="text-[10px] text-stone-400 font-mono">{searchData.results.length} {t.passages}</span>
-                  <span class="w-5 h-5 flex items-center justify-center rounded-md bg-stone-800 text-stone-300 transition-transform duration-200 chevron-icon rotate-180">
+                  <span class="badge badge-xs badge-neutral font-mono">{searchData.results.length} {t.passages}</span>
+                  <span class="w-5 h-5 flex items-center justify-center rounded-md bg-base-200 text-base-content/60 transition-transform duration-200 chevron-icon rotate-180">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </span>
                 </div>
               </button>
 
               <!-- Collapsible Body -->
-              <div id="card-body-ai" class="space-y-3 pt-2 border-t border-stone-800">
+              <div id="card-body-ai" class="space-y-3 pt-2 border-t border-base-200">
                 <!-- Side-by-Side Copy Buttons -->
                 <div class="grid grid-cols-2 gap-2 pt-1">
                   <!-- Button 1: Copy Full Dataset -->
                   <button
                     type="button"
                     id="copy-all-results-btn-sidebar"
-                    class="btn btn-sm bg-stone-800 hover:bg-stone-700 text-emerald-300 font-bold border border-stone-700 gap-1 text-[11px] px-2 justify-center"
+                    class="btn btn-sm btn-outline btn-primary font-bold gap-1 text-[11px] px-2 justify-center"
                     title={t.copyAllResultsForAI}
                   >
                     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <span class="truncate">{currentLang === 'en' ? 'Full Data' : currentLang === 'id' ? 'Teks Lengkap' : 'كامل النصوص'}</span>
                   </button>
@@ -526,11 +562,11 @@ const hasActiveFilters = Boolean(category || era || tradition);
                   <button
                     type="button"
                     id="copy-page-url-btn"
-                    class="btn btn-sm bg-emerald-700 hover:bg-emerald-800 text-white font-bold border-0 gap-1 text-[11px] px-2 justify-center"
+                    class="btn btn-sm btn-primary font-bold gap-1 text-[11px] px-2 justify-center"
                     title={t.copyPageUrlForAI}
                   >
                     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                     </svg>
                     <span class="truncate">{currentLang === 'en' ? 'Page URL' : currentLang === 'id' ? 'Tautan URL' : 'رابط الصفحة'}</span>
                   </button>
@@ -542,9 +578,9 @@ const hasActiveFilters = Boolean(category || era || tradition);
           <!-- ======================================================== -->
           <!-- 4. READING & DISPLAY CONTROLS CARD (Self-Collapsible)    -->
           <!-- ======================================================== -->
-          {searchData && searchData.results.length > 0 && (
+          <div id="sidebar-controls-section">
             <SearchControls client:load lang={currentLang} />
-          )}
+          </div>
 
         </div>
       </aside>

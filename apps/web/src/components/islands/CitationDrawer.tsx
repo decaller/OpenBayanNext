@@ -10,6 +10,7 @@ import {
 } from '../../stores/workspace';
 import { PUBLIC_API_URL, type ChapterStreamResponse, type ChapterChunkItem } from '../../lib/api';
 import { translations, formatAIPassagePrompt } from '../../lib/i18n';
+import { sanitizeSnippetText } from '../../lib/highlighter';
 
 export const CitationDrawer: React.FC = () => {
   const isOpen = useStore($isDrawerOpen);
@@ -97,13 +98,15 @@ export const CitationDrawer: React.FC = () => {
 
   const handleCopyPassageForAI = (chunk: { chunk_id: number; volume_page: string; raw_text: string; footnotes?: string | null }) => {
     if (!section) return;
+    const cleanText = sanitizeSnippetText(chunk.raw_text);
+    const cleanFootnotes = chunk.footnotes ? sanitizeSnippetText(chunk.footnotes) : undefined;
     const prompt = formatAIPassagePrompt({
       chunk_id: chunk.chunk_id,
       book_name: section.sectionTitle,
       volume_page: chunk.volume_page,
       breadcrumb: section.breadcrumb,
-      raw_text: chunk.raw_text,
-      footnotes: chunk.footnotes,
+      raw_text: cleanText,
+      footnotes: cleanFootnotes,
     }, currentLang);
 
     navigator.clipboard.writeText(prompt);
@@ -183,7 +186,7 @@ export const CitationDrawer: React.FC = () => {
         {/* Header Bar */}
         <div className="p-4 sm:p-5 border-b border-base-200 bg-base-100/95 backdrop-blur flex items-start justify-between gap-4">
           <div className="flex-1 overflow-hidden space-y-1">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-primary">
               <span>{t.canonicalNode} #{section?.focusChunkId || section?.sectionId}</span>
               <span>•</span>
               <span>{data?.total_chunks || 0} {t.connectedPages}</span>
@@ -212,7 +215,7 @@ export const CitationDrawer: React.FC = () => {
             <div className="font-bold text-base-content/70 uppercase tracking-wider text-[11px]">
               {t.sectionTaxonomy}
             </div>
-            <div className="font-mono text-emerald-800 dark:text-emerald-300 text-xs bg-base-100 p-2.5 rounded-lg border border-base-300/50">
+            <div className="font-mono text-primary text-xs bg-base-100 p-2.5 rounded-lg border border-base-300/50">
               {section?.breadcrumb}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -253,10 +256,10 @@ export const CitationDrawer: React.FC = () => {
                   type="button"
                   onClick={handleLoadEarlier}
                   disabled={loadingEarlier}
-                  className="w-full btn btn-sm btn-outline border-dashed border-base-300 hover:border-emerald-600 text-base-content/70 hover:text-emerald-800 text-xs font-sans rounded-xl py-2 flex items-center justify-center gap-2 transition-all"
+                  className="w-full btn btn-sm btn-outline border-dashed border-base-300 hover:border-primary text-base-content/70 hover:text-primary text-xs font-sans rounded-xl py-2 flex items-center justify-center gap-2 transition-all"
                 >
                   {loadingEarlier ? (
-                    <span className="loading loading-spinner loading-xs text-emerald-700"></span>
+                    <span className="loading loading-spinner loading-xs text-primary"></span>
                   ) : (
                     <>
                       <span className="text-base font-bold">⌃</span>
@@ -270,7 +273,7 @@ export const CitationDrawer: React.FC = () => {
 
           {loading && (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-base-content/60">
-              <span className="loading loading-spinner loading-lg text-emerald-800"></span>
+              <span className="loading loading-spinner loading-lg text-primary"></span>
               <span className="text-sm">{t.loadingChapter}</span>
             </div>
           )}
@@ -287,13 +290,15 @@ export const CitationDrawer: React.FC = () => {
               {data.chunks.map((chunk) => {
                 const isFocus = chunk.chunk_id === section?.focusChunkId;
                 const isPreceding = section?.focusChunkId && chunk.chunk_id < section.focusChunkId;
+                const cleanChunkText = sanitizeSnippetText(chunk.raw_text);
+                const cleanFootnotes = chunk.footnotes ? sanitizeSnippetText(chunk.footnotes) : null;
 
                 return (
                   <div key={chunk.chunk_id} className="space-y-1.5">
                     {/* Position Label Tag */}
                     <div className="text-[11px] font-mono font-bold flex items-center justify-between px-1">
                       {isFocus ? (
-                        <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1 font-sans">
+                        <span className="text-primary flex items-center gap-1 font-sans">
                           {t.focusChunkLabel} (#{chunk.chunk_id})
                         </span>
                       ) : isPreceding ? (
@@ -314,21 +319,21 @@ export const CitationDrawer: React.FC = () => {
                       id={`drawer-chunk-${chunk.chunk_id}`}
                       className={`p-5 rounded-2xl transition-all duration-300 ${
                         isFocus 
-                          ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-2 border-emerald-600 shadow-sm' 
-                          : 'bg-base-100 border border-base-200/80 shadow-2xs'
+                          ? 'bg-primary/10 border-2 border-primary shadow-sm' 
+                          : 'bg-base-100 border border-base-200 shadow-2xs'
                       }`}
                     >
                       {/* Top bar inside chunk */}
                       <div className="flex items-center justify-between pb-2 mb-2 border-b border-base-200/50 text-xs">
-                        <span className="font-mono font-bold text-emerald-800 dark:text-emerald-400">
+                        <span className="font-mono font-bold text-primary">
                           {chunk.volume_page}
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleCopyPassageForAI(chunk)}
-                          className="btn btn-ghost btn-xs text-base-content/60 hover:text-emerald-800 gap-1 font-sans"
+                          onClick={() => handleCopyPassageForAI({ ...chunk, raw_text: cleanChunkText, footnotes: cleanFootnotes })}
+                          className="btn btn-ghost btn-xs text-base-content/60 hover:text-primary gap-1 font-sans"
                         >
-                          <svg className="w-3 h-3 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                           </svg>
                           <span>{t.copyForAI}</span>
@@ -337,14 +342,14 @@ export const CitationDrawer: React.FC = () => {
 
                       {/* Classical Text Body (Amiri Font) */}
                       <div className={`arabic-matn text-base-content/90 ${fontClass}`} dir="rtl">
-                        {chunk.raw_text}
+                        {cleanChunkText}
                       </div>
 
                       {/* Footnotes if present */}
-                      {chunk.footnotes && (
+                      {cleanFootnotes && (
                         <div className="mt-4 pt-3 border-t border-dashed border-base-200 text-xs font-sans text-base-content/60 bg-base-200/30 rounded-lg p-3 leading-relaxed" dir="rtl">
                           <span className="font-bold text-base-content/80">{t.footnotesTitle} </span>
-                          <span>{chunk.footnotes}</span>
+                          <span>{cleanFootnotes}</span>
                         </div>
                       )}
                     </article>
@@ -366,10 +371,10 @@ export const CitationDrawer: React.FC = () => {
                   type="button"
                   onClick={handleLoadLater}
                   disabled={loadingLater}
-                  className="w-full btn btn-sm btn-outline border-dashed border-base-300 hover:border-emerald-600 text-base-content/70 hover:text-emerald-800 text-xs font-sans rounded-xl py-2 flex items-center justify-center gap-2 transition-all"
+                  className="w-full btn btn-sm btn-outline border-dashed border-base-300 hover:border-primary text-base-content/70 hover:text-primary text-xs font-sans rounded-xl py-2 flex items-center justify-center gap-2 transition-all"
                 >
                   {loadingLater ? (
-                    <span className="loading loading-spinner loading-xs text-emerald-700"></span>
+                    <span className="loading loading-spinner loading-xs text-primary"></span>
                   ) : (
                     <>
                       <span className="text-base font-bold">⌄</span>
@@ -396,7 +401,7 @@ export const CitationDrawer: React.FC = () => {
           <button
             type="button"
             onClick={handleCopyCitation}
-            className="btn btn-sm bg-emerald-800 hover:bg-emerald-900 text-white font-bold gap-1.5 shadow-sm border-0"
+            className="btn btn-sm btn-primary font-bold gap-1.5 shadow-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -408,3 +413,4 @@ export const CitationDrawer: React.FC = () => {
     </div>
   );
 };
+

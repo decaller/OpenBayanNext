@@ -44,9 +44,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto font-sans">
-      <div className={`relative flex items-center bg-base-100 rounded-2xl border-2 border-emerald-800/20 focus-within:border-emerald-700 shadow-sm transition-all ${isLarge ? 'p-2 sm:p-2.5' : 'p-1.5'}`}>
+      <div className={`relative flex items-center bg-base-100 rounded-2xl border-2 border-base-300 focus-within:border-primary shadow-sm transition-all ${isLarge ? 'p-2 sm:p-2.5' : 'p-1.5'}`}>
         {/* Search Icon */}
-        <div className="pl-3 pr-2 text-emerald-800/60 flex items-center">
+        <div className="pl-3 pr-2 text-primary flex items-center">
           <svg className={isLarge ? "w-6 h-6" : "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -77,7 +77,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Submit Button */}
         <button
           type="submit"
-          className={`btn btn-emerald bg-emerald-800 hover:bg-emerald-900 text-white font-bold rounded-xl mx-2 ${isLarge ? 'px-6 btn-md' : 'px-4 btn-sm'}`}
+          className={`btn btn-primary font-bold rounded-xl mx-2 ${isLarge ? 'px-6 btn-md' : 'px-4 btn-sm'}`}
         >
           {t.searchBtn}
         </button>
@@ -91,21 +91,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <button
               type="button"
               onClick={() => setMode('hybrid')}
-              className={`join-item btn btn-xs border-0 ${mode === 'hybrid' ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
+              className={`join-item btn btn-xs border-0 ${mode === 'hybrid' ? 'btn-active btn-primary font-bold shadow-xs' : 'btn-ghost'}`}
             >
               {t.modeHybrid}
             </button>
             <button
               type="button"
               onClick={() => setMode('fts')}
-              className={`join-item btn btn-xs border-0 ${mode === 'fts' ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
+              className={`join-item btn btn-xs border-0 ${mode === 'fts' ? 'btn-active btn-primary font-bold shadow-xs' : 'btn-ghost'}`}
             >
               {t.modeFts}
             </button>
             <button
               type="button"
               onClick={() => setMode('vector')}
-              className={`join-item btn btn-xs border-0 ${mode === 'vector' ? 'btn-active bg-emerald-800 text-white font-bold' : 'btn-ghost'}`}
+              className={`join-item btn btn-xs border-0 ${mode === 'vector' ? 'btn-active btn-primary font-bold shadow-xs' : 'btn-ghost'}`}
             >
               {t.modeVector}
             </button>
@@ -117,5 +117,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </span>
       </div>
     </form>
+
   );
 };

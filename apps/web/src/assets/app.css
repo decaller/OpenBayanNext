@@ -43,11 +43,17 @@ body {
 .arabic-matn {
   font-family: var(--font-amiri);
   line-height: 2.3;
-  letter-spacing: 0.01em;
-  text-align: justify;
-  text-justify: inter-word;
+  letter-spacing: normal;
+  text-align: right;
   font-feature-settings: "cv01", "cv02", "ss01";
-  transition: font-size 0.2s ease, line-height 0.2s ease;
+  transition: font-size 0.2s cubic-bezier(0.16, 1, 0.3, 1), line-height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 640px) {
+  .arabic-matn {
+    text-align: justify;
+    text-justify: inter-word;
+  }
 }
 
 .arabic-heading {
@@ -104,6 +110,7 @@ body {
   color: inherit !important;
   padding: 0 !important;
   border-radius: 0 !important;
+  border-bottom: 0 !important;
 }
 
 .chunk-font-sm .arabic-matn {
@@ -149,7 +156,8 @@ body {
 /* Page Break Divider for Merged Sibling Passages */
 .page-divider {
   border: 0;
-  border-top: 1px dashed rgba(16, 185, 129, 0.4);
+  border-top: 1px dashed var(--color-primary, #66cc8a);
+  opacity: 0.5;
   position: relative;
   margin: 1.5rem 0;
 }
@@ -164,16 +172,29 @@ body {
   padding: 0 0.75rem;
   font-size: 0.7rem;
   font-family: var(--font-sans);
-  color: rgba(16, 185, 129, 0.8);
+  color: var(--color-primary, #66cc8a);
   font-weight: 700;
   border-radius: 9999px;
-  border: 1px dashed rgba(16, 185, 129, 0.3);
+  border: 1px dashed var(--color-primary, #66cc8a);
 }
 
 /* Ensure discourse blocks are hidden by default before JS hydration */
 .preceding-discourse-block,
 .succeeding-discourse-block {
   display: none !important;
+}
+
+/* Tactile Micro-Interactions */
+button:not(:disabled), 
+.btn:not(.btn-disabled), 
+[role="button"] {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s ease;
+}
+
+button:not(:disabled):active, 
+.btn:not(.btn-disabled):active, 
+[role="button"]:active {
+  transform: scale(0.98);
 }
 
 /* Scrollbar refinement */
@@ -193,4 +214,14 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(150, 150, 150, 0.45);
+}
+
+/* Prefers Reduced Motion Guard */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
