@@ -28,12 +28,18 @@ const t = translations[currentLang];
     </p>
 
     <!-- Large Search Bar Island -->
-    <div id="main-search-container" class="w-full mb-8">
+    <div id="main-search-container" class="w-full mb-4">
       <SearchBar client:load size="large" autoFocus={true} lang={currentLang} />
     </div>
 
+    <!-- Multilingual AI Search Guidance Note -->
+    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-base-200/50 border border-base-200 text-xs font-sans text-base-content/75 max-w-xl mb-6 leading-relaxed shadow-2xs">
+      <span class="text-base flex-shrink-0">🌐</span>
+      <span>{t.multilingualHint}</span>
+    </div>
+
     <!-- Quick Exploration Chips -->
-    <div class="flex flex-wrap items-center justify-center gap-2 text-xs font-sans text-base-content/70 mt-2">
+    <div class="flex flex-wrap items-center justify-center gap-2 text-xs font-sans text-base-content/70 mt-1">
       <span class="font-bold text-base-content/50">{t.quickExamples}</span>
       <a href={`/search?q=إنما+الأعمال+بالنيات&lang=${currentLang}`} class="badge badge-lg badge-outline hover:badge-primary transition-colors py-3">
         إنما الأعمال بالنيات

@@ -18,6 +18,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [query, setQuery] = useState(initialQuery);
   const [mode, setMode] = useState<'hybrid' | 'fts' | 'vector'>(initialMode);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const t = translations[lang] || translations.ar;
 
@@ -43,7 +44,27 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const isLarge = size === 'large';
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto font-sans">
+    <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto font-sans relative">
+      
+      {/* Dynamic Active Hint (Appears seamlessly when search box is focused) */}
+      <div 
+        className={`transition-all duration-300 ease-out overflow-hidden ${
+          isFocused 
+            ? 'max-h-16 opacity-100 mb-2' 
+            : 'max-h-0 opacity-0 mb-0 pointer-events-none'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2 bg-primary/10 border border-primary/30 text-primary text-xs px-3.5 py-2 rounded-xl shadow-xs">
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs font-medium text-start">
+            <span className="text-sm">🌐</span>
+            <span>{t.multilingualHint}</span>
+          </div>
+          <span className="badge badge-xs badge-primary font-bold flex-shrink-0 hidden sm:inline-flex">
+            {lang === 'ar' ? 'العربية أدق' : lang === 'id' ? 'Arab Terakurat' : 'Arabic Best'}
+          </span>
+        </div>
+      </div>
+
       <div className={`relative flex items-center bg-base-100 rounded-2xl border-2 border-base-300 focus-within:border-primary shadow-sm transition-all ${isLarge ? 'p-2 sm:p-2.5' : 'p-1.5'}`}>
         {/* Search Icon */}
         <div className="pl-3 pr-2 text-primary flex items-center">
@@ -58,6 +79,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           placeholder={t.searchPlaceholder}
           autoFocus={autoFocus}
           className={`w-full bg-transparent outline-none font-sans text-base-content placeholder:text-base-content/40 ${isLarge ? 'text-base sm:text-lg py-2' : 'text-sm sm:text-base py-1'}`}
@@ -117,6 +140,5 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </span>
       </div>
     </form>
-
   );
 };

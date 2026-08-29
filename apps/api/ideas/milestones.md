@@ -80,11 +80,14 @@ A focused, high-performance content search and reading platform for classical Is
 * **Slide-Out Reading Drawer:** Implement `<CitationDrawer client:idle/>` using controlled DaisyUI classes bound to Nanostores (`$isDrawerOpen`, `$activeCitation`) for reading entire chapters without page reloads.
 * **Typography & RTL:** Configure Tailwind with classical Arabic font stacks (`Amiri`, `Traditional Arabic`) and high-contrast paper tones.
 
-### Milestone 4: Production Containerization & Crawler Verification
+### Milestone 4: Production Containerization, OpenSearch & AI Crawler Protocol
 
-* **Gateway Configuration:** Route both services behind Zoraxy (`/` and `/search` to Astro on port 4321; `/api/v1/*` to FastAPI on port 8000).
-* **Production Containerization:** Assemble a lean `compose.yml` deploying Astro (Node SSR) and FastAPI with the database mounted as read-only (`:ro`).
-* **Latency & SEO Audit:** Validate that search API response times remain under $10\text{ ms}$ and verify that bots (`GPTBot`, `ClaudeBot`, `curl`) extract complete passage text from first-byte HTML responses.
+* **OpenSearch 1.1 Specification:** Deploy `/opensearch.xml` auto-discovery in `<head>` allowing desktop and mobile browsers (Chrome, Firefox, Safari) to add OpenBayan directly into the browser URL search bar (Omnibox).
+* **AI & LLM Grounding Protocol (`/llms.txt`):** Implement standardized machine-readable documentation defining URL search schemes, parameter specs, and passage permalink endpoints for autonomous LLM agents (ChatGPT, Claude, Perplexity, DeepResearch).
+* **Robots & Dynamic Sitemap (`/robots.txt`, `/sitemap.xml`):** Configure explicit crawler access for AI agents (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Googlebot`) and generate streaming XML sitemaps for all 60 canonical books and high-level chapter nodes.
+* **First-Byte Raw HTML & Schema.org Verification:** Validate 100% server-rendered first-byte text delivery with valid `ScholarlyArticle` JSON-LD metadata for crawlers without client JavaScript dependencies.
+* **Automated Crawler Benchmark Suite (`scripts/benchmark_crawlers.sh`):** Benchmark TTFB, payload size, Arabic content extraction, and Schema validation across 5 standard user-agents.
+* **Production Gateway & Containerization:** Assemble a production `compose.yml` deploying Astro SSR and FastAPI behind the **Zoraxy** reverse proxy with single-domain zero-CORS routing and `:ro` (read-only) NVMe database volume mounts.
 
 ---
 
@@ -95,4 +98,5 @@ A focused, high-performance content search and reading platform for classical Is
 | **M1 Gate** | 10k passages indexed with FTS5 + 768-dim vectors | Execution $< 90\text{s}$, 0 Java dependencies |
 | **M2 Gate** | Combined hybrid search + sibling merge | Latency $< 8\text{ ms}$ |
 | **M3 Gate** | Astro SSR reader `/p/:id` rendered with 0 CLS | Raw HTML $< 2\text{ KB}$, 0 client JS |
-| **M4 Gate** | Production Docker stack with Zoraxy single-domain | 100% bot first-byte crawl pass, $< 10\text{ms}$ API SLA |
+| **M3.5 Gate** | Faceted filters, Ayah citations & 100% vector matrix | 76,083 vectors in RAM ($< 4\text{ms}$ dot-product) |
+| **M4 Gate** | OpenSearch, `/llms.txt`, Zoraxy Gateway & Crawler Benchmark | 100% bot first-byte crawl pass (`GPTBot`/`ClaudeBot`), OpenSearch XML valid |
