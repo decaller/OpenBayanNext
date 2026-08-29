@@ -6,6 +6,7 @@ import { SearchControls } from '../components/islands/SearchControls';
 import { INTERNAL_API_URL, type SearchResponse } from '../lib/api';
 import { translations, getLangFromUrl, formatAllSearchResultsPrompt } from '../lib/i18n';
 import { clusterSearchResults } from '../lib/thematic_clusterer';
+import { createFacetUrl } from '../lib/url';
 
 // Parse query params
 const currentLang = getLangFromUrl(Astro.url);
@@ -14,13 +15,27 @@ const t = translations[currentLang];
 const query = Astro.url.searchParams.get('q') || '';
 const limit = 60; // Fetch all candidate results in a single unified page
 const mode = (Astro.url.searchParams.get('mode') || 'hybrid') as 'hybrid' | 'fts' | 'vector';
+const category = Astro.url.searchParams.get('category') || null;
+const era = Astro.url.searchParams.get('era') || null;
+const tradition = Astro.url.searchParams.get('tradition') || null;
 
 let searchData: SearchResponse | null = null;
 let error: string | null = null;
 
 if (query.trim()) {
   try {
-    const fetchUrl = `${INTERNAL_API_URL}/search?q=${encodeURIComponent(query.trim())}&page=1&limit=${limit}&mode=${mode}&merge_siblings=true`;
+    const params = new URLSearchParams({
+      q: query.trim(),
+      page: '1',
+      limit: limit.toString(),
+      mode: mode,
+      merge_siblings: 'true'
+    });
+    if (category) params.set('category', category);
+    if (era) params.set('era', era);
+    if (tradition) params.set('tradition', tradition);
+
+    const fetchUrl = `${INTERNAL_API_URL}/search?${params.toString()}`;
     const res = await fetch(fetchUrl);
     if (res.ok) {
       searchData = await res.json();
@@ -43,6 +58,32 @@ const clusters = searchData
 const allResultsAIPrompt = searchData 
   ? formatAllSearchResultsPrompt(searchData.results, query, currentLang)
   : '';
+
+// Category filter items
+const categoryOptions = [
+  { id: null, label: t.allCategories },
+  { id: 'شروح الحديث', label: 'شروح الحديث' },
+  { id: 'كتب السنة', label: 'كتب السنة' },
+  { id: 'التفسير', label: 'التفسير' },
+  { id: 'الفقه الشافعي', label: 'الفقه الشافعي' },
+  { id: 'الفقه المالكي', label: 'الفقه المالكي' },
+  { id: 'العقيدة', label: 'العقيدة' },
+];
+
+const eraOptions = [
+  { id: null, label: t.allEras },
+  { id: 'early', label: t.eraEarly },
+  { id: 'classical', label: t.eraClassical },
+  { id: 'late', label: t.eraLate },
+];
+
+const traditionOptions = [
+  { id: null, label: t.allTraditions },
+  { id: 'classical_jumhur', label: t.traditionClassicalJumhur },
+  { id: 'athari_salafi', label: t.traditionAthariSalafi },
+];
+
+const hasActiveFilters = Boolean(category || era || tradition);
 ---
 
 <BaseLayout title={pageTitle} lang={currentLang}>
@@ -69,13 +110,56 @@ const allResultsAIPrompt = searchData
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
       
       <!-- Main Results Column (8 cols): Thematic Structured Groups -->
-      <section id="search-results-container" class="lg:col-span-8 space-y-10 depth-level-1">
+      <section id="search-results-container" class="lg:col-span-8 space-y-8 depth-level-1">
         
+        <!-- ======================================================== -->
+        <!-- SCRIPTURE CITATION DIRECT INTERCEPTOR PINNED CARD -->
+        <!-- ======================================================== -->
+        {searchData?.pinned_citation && (
+          <div class="bg-gradient-to-r from-emerald-900 to-teal-950 text-white p-5 rounded-2xl shadow-md border border-emerald-700/60 font-sans space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="badge badge-warning font-bold text-xs">
+                  {t.scriptureCitationPinned.split(':')[0]}
+                </span>
+                <span class="font-bold text-emerald-200">
+                  {searchData.pinned_citation.citation.display_title}
+                </span>
+              </div>
+              <span class="text-emerald-300/80 font-mono text-[11px]">
+                {searchData.pinned_citation.book_name} ({searchData.pinned_citation.volume_page})
+              </span>
+            </div>
+
+            <div class="arabic-matn text-emerald-50 text-base leading-loose p-3 bg-black/20 rounded-xl border border-emerald-500/20" dir="rtl">
+              {searchData.pinned_citation.raw_text.slice(0, 380)}...
+            </div>
+
+            <div class="flex items-center justify-between pt-1 text-[11px] text-emerald-300">
+              <span class="truncate">
+                {searchData.pinned_citation.breadcrumb}
+              </span>
+              <button
+                type="button"
+                class="btn btn-xs bg-emerald-700 hover:bg-emerald-600 text-white font-bold border-0"
+                data-open-drawer
+                data-book-id={searchData.pinned_citation.book_id}
+                data-chunk-id={searchData.pinned_citation.chunk_id}
+                data-section-title={searchData.pinned_citation.section_title}
+                data-breadcrumb={searchData.pinned_citation.breadcrumb}
+              >
+                {t.exploreInSidebar}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <!-- Thematic Groups -->
         {clusters.map((cluster) => {
           // Limit every thematic cluster to top 5 results on the page
           const topResults = cluster.results.slice(0, 5);
           const themeQuery = cluster.rawTopic || cluster.title;
-          const themeQueryUrl = `/search?q=${encodeURIComponent(themeQuery)}&mode=${mode}&lang=${currentLang}`;
+          const themeQueryUrl = createFacetUrl(Astro.url, { q: themeQuery });
 
           return (
             <section id={cluster.id} class="space-y-4 scroll-mt-24">
@@ -180,7 +264,7 @@ const allResultsAIPrompt = searchData
         })}
 
         <!-- Empty State -->
-        {searchData && searchData.results.length === 0 && (
+        {searchData && searchData.results.length === 0 && !searchData.pinned_citation && (
           <div class="text-center py-16 bg-base-100/60 rounded-3xl border border-dashed border-base-300 p-8 my-6">
             <div class="w-12 h-12 rounded-full bg-base-200 text-base-content/40 flex items-center justify-center mx-auto mb-3 text-xl">
               🔍
@@ -197,115 +281,267 @@ const allResultsAIPrompt = searchData
       <aside class="lg:col-span-4 floating-sidebar space-y-4 font-sans max-h-[calc(100vh-6.5rem)] overflow-y-auto pr-1">
         <div class="space-y-4">
           
-          <!-- 1. Thematic Structure Navigation Outline -->
+          <!-- ======================================================== -->
+          <!-- 1. COLLAPSIBLE FACET FILTERS CARD (Default Closed)       -->
+          <!-- ======================================================== -->
+          {query && (
+            <div class="bg-base-100 border border-base-200 rounded-2xl p-4 shadow-sm space-y-3 font-sans text-xs transition-all" id="sidebar-card-facets">
+              <button
+                type="button"
+                data-toggle-collapse="facets"
+                class="flex items-center justify-between w-full font-bold text-base-content hover:text-emerald-800 dark:hover:text-emerald-400 transition-colors text-start focus:outline-none"
+                title="Toggle Discipline & Tradition Filters"
+              >
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span>{t.filterByDiscipline.replace(':', '')}</span>
+                  {hasActiveFilters && (
+                    <span class="badge badge-xs badge-primary font-mono font-bold">1+</span>
+                  )}
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  {hasActiveFilters && (
+                    <a
+                      href={createFacetUrl(Astro.url, { category: null, era: null, tradition: null })}
+                      class="text-[10px] text-rose-600 hover:underline font-bold me-1"
+                      title="Reset all filters"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {currentLang === 'en' ? 'Reset' : currentLang === 'id' ? 'Reset' : 'إلغاء'}
+                    </a>
+                  )}
+                  <span class="w-5 h-5 flex items-center justify-center rounded-md bg-base-200 text-base-content/60 transition-transform duration-200 chevron-icon">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+              </button>
+
+              <!-- Collapsible Body (Default Hidden) -->
+              <div id="card-body-facets" class="space-y-3 pt-2 border-t border-base-200/60 hidden">
+                <!-- Section A: Discipline / Category Facets -->
+                <div class="space-y-1.5">
+                  <span class="font-bold text-[11px] text-base-content/60 block">{t.filterByDiscipline}</span>
+                  <div class="flex flex-wrap gap-1">
+                    {categoryOptions.map((cat) => {
+                      const isSelected = (cat.id === null && !category) || category === cat.id;
+                      const facetUrl = createFacetUrl(Astro.url, { category: cat.id });
+                      return (
+                        <a
+                          href={facetUrl}
+                          class={`badge badge-sm rounded-lg transition-all text-[11px] ${
+                            isSelected
+                              ? 'bg-emerald-800 text-white font-bold shadow-xs'
+                              : 'bg-base-200/80 text-base-content/70 hover:bg-base-200 hover:text-base-content border-0'
+                          }`}
+                        >
+                          {cat.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <!-- Section B: Historical Era Facets -->
+                <div class="space-y-1.5 pt-1.5 border-t border-base-200/50">
+                  <span class="font-bold text-[11px] text-base-content/60 block">{t.filterByEra}</span>
+                  <div class="flex flex-wrap gap-1">
+                    {eraOptions.map((e) => {
+                      const isSelected = (e.id === null && !era) || era === e.id;
+                      const facetUrl = createFacetUrl(Astro.url, { era: e.id });
+                      return (
+                        <a
+                          href={facetUrl}
+                          class={`badge badge-xs transition-all ${
+                            isSelected 
+                              ? 'badge-neutral font-bold' 
+                              : 'badge-ghost text-base-content/60 hover:badge-outline'
+                          }`}
+                        >
+                          {e.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <!-- Section C: Theological & Fiqh Tradition Facets -->
+                <div class="space-y-1.5 pt-1.5 border-t border-base-200/50">
+                  <span class="font-bold text-[11px] text-base-content/60 block">{t.filterByTradition}</span>
+                  <div class="flex flex-wrap gap-1">
+                    {traditionOptions.map((tr) => {
+                      const isSelected = (tr.id === null && !tradition) || tradition === tr.id;
+                      const facetUrl = createFacetUrl(Astro.url, { tradition: tr.id });
+                      return (
+                        <a
+                          href={facetUrl}
+                          class={`badge badge-xs transition-all ${
+                            isSelected 
+                              ? 'badge-primary font-bold' 
+                              : 'badge-ghost text-base-content/60 hover:badge-outline'
+                          }`}
+                        >
+                          {tr.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <!-- ======================================================== -->
+          <!-- 2. COLLAPSIBLE THEMATIC STRUCTURE CARD (Default Open)    -->
+          <!-- ======================================================== -->
           {clusters.length > 0 && (
-            <div class="bg-base-100 border border-base-200 rounded-2xl p-4 shadow-sm space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-base-200/60 font-bold text-xs text-base-content">
+            <div class="bg-base-100 border border-base-200 rounded-2xl p-4 shadow-sm space-y-3 font-sans text-xs transition-all" id="sidebar-card-thematic">
+              <button
+                type="button"
+                data-toggle-collapse="thematic"
+                class="flex items-center justify-between w-full font-bold text-base-content hover:text-emerald-800 dark:hover:text-emerald-400 transition-colors text-start focus:outline-none"
+                title="Toggle Thematic Structure"
+              >
                 <div class="flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                   <span>{t.thematicStructure}</span>
                 </div>
-                <span class="badge badge-xs badge-neutral font-mono">{clusters.length} {t.sectionsCount}</span>
-              </div>
-
-              <!-- Scrollable Thematic Navigation List (Max-height 52) -->
-              <div class="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                {clusters.map((cl) => (
-                  <a
-                    href={`#${cl.id}`}
-                    data-smooth-scroll
-                    class="block p-3 rounded-xl border border-base-200/80 hover:border-emerald-600 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-all text-xs group"
-                  >
-                    <div class="flex items-center justify-between mb-1">
-                      <span class="font-bold text-base-content group-hover:text-emerald-800 dark:group-hover:text-emerald-400">
-                        {cl.title}
-                      </span>
-                      <div class="flex items-center gap-1">
-                        <!-- Navigation Item Accuracy Badge -->
-                        <span class="badge badge-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-mono font-bold" title={t.matchAccuracy}>
-                          {cl.accuracy_percentage}%
-                        </span>
-                        <span class="badge badge-xs badge-ghost font-mono" title={`${cl.doc_count} passages found`}>
-                          {cl.doc_count}
-                        </span>
-                      </div>
-                    </div>
-                    <p class="text-[11px] text-base-content/60 truncate">
-                      {cl.summary}
-                    </p>
-                  </a>
-                ))}
-              </div>
-
-              <!-- Telemetry Metrics inside Sidebar -->
-              {searchData && (
-                <div class="pt-3 border-t border-base-200/60 space-y-1.5 text-xs text-base-content/70">
-                  <div class="flex justify-between">
-                    <span class="text-base-content/50">{t.retrievalMode}</span>
-                    <span class="font-bold text-emerald-800 dark:text-emerald-400">
-                      {mode === 'hybrid' ? t.modeHybrid : mode === 'fts' ? t.modeFts : t.modeVector}
-                    </span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-base-content/50">{t.tookTime}</span>
-                    <span class="font-mono text-emerald-700 font-bold">{searchData.took_ms} ms</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-base-content/50">{t.engine}</span>
-                    <span class="font-mono">SQLite FTS5 + ONNX</span>
-                  </div>
+                
+                <div class="flex items-center gap-1.5">
+                  <span class="badge badge-xs badge-neutral font-mono">{clusters.length} {t.sectionsCount}</span>
+                  <span class="w-5 h-5 flex items-center justify-center rounded-md bg-base-200 text-base-content/60 transition-transform duration-200 chevron-icon rotate-180">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
                 </div>
-              )}
+              </button>
+
+              <!-- Collapsible Body -->
+              <div id="card-body-thematic" class="space-y-3 pt-2 border-t border-base-200/60">
+                <!-- Scrollable Thematic Navigation List (Max-height 52) -->
+                <div class="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                  {clusters.map((cl) => (
+                    <a
+                      href={`#${cl.id}`}
+                      data-smooth-scroll
+                      class="block p-3 rounded-xl border border-base-200/80 hover:border-emerald-600 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-all text-xs group"
+                    >
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-base-content group-hover:text-emerald-800 dark:group-hover:text-emerald-400">
+                          {cl.title}
+                        </span>
+                        <div class="flex items-center gap-1">
+                          <!-- Navigation Item Accuracy Badge -->
+                          <span class="badge badge-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-mono font-bold" title={t.matchAccuracy}>
+                            {cl.accuracy_percentage}%
+                          </span>
+                          <span class="badge badge-xs badge-ghost font-mono" title={`${cl.doc_count} passages found`}>
+                            {cl.doc_count}
+                          </span>
+                        </div>
+                      </div>
+                      <p class="text-[11px] text-base-content/60 truncate">
+                        {cl.summary}
+                      </p>
+                    </a>
+                  ))}
+                </div>
+
+                <!-- Telemetry Metrics inside Sidebar -->
+                {searchData && (
+                  <div class="pt-3 border-t border-base-200/60 space-y-1.5 text-xs text-base-content/70">
+                    <div class="flex justify-between">
+                      <span class="text-base-content/50">{t.retrievalMode}</span>
+                      <span class="font-bold text-emerald-800 dark:text-emerald-400">
+                        {mode === 'hybrid' ? t.modeHybrid : mode === 'fts' ? t.modeFts : t.modeVector}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-base-content/50">{t.tookTime}</span>
+                      <span class="font-mono text-emerald-700 font-bold">{searchData.took_ms} ms</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-base-content/50">{t.engine}</span>
+                      <span class="font-mono">SQLite FTS5 + ONNX</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          <!-- 2. Simplified AI Grounding Card with Side-by-Side Buttons -->
+          <!-- ======================================================== -->
+          <!-- 3. COLLAPSIBLE AI GROUNDING CARD (Default Open)          -->
+          <!-- ======================================================== -->
           {searchData && searchData.results.length > 0 && (
-            <div class="bg-gradient-to-br from-stone-900 to-slate-950 text-white rounded-2xl p-4 shadow-sm border border-stone-800 space-y-3 text-xs">
-              <div class="flex items-center justify-between font-bold text-emerald-400 text-xs">
+            <div class="bg-gradient-to-br from-stone-900 to-slate-950 text-white rounded-2xl p-4 shadow-sm border border-stone-800 space-y-3 font-sans text-xs transition-all" id="sidebar-card-ai">
+              <button
+                type="button"
+                data-toggle-collapse="ai"
+                class="flex items-center justify-between w-full font-bold text-emerald-400 hover:text-emerald-300 transition-colors text-start focus:outline-none"
+                title="Toggle AI Grounding Tools"
+              >
                 <div class="flex items-center gap-1.5">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   <span>{t.exploreWithAI}</span>
                 </div>
-                <span class="text-[10px] text-stone-400 font-mono">{searchData.results.length} {t.passages}</span>
-              </div>
 
-              <!-- Side-by-Side Copy Buttons -->
-              <div class="grid grid-cols-2 gap-2 pt-1">
-                <!-- Button 1: Copy Full Dataset -->
-                <button
-                  type="button"
-                  id="copy-all-results-btn-sidebar"
-                  class="btn btn-sm bg-stone-800 hover:bg-stone-700 text-emerald-300 font-bold border border-stone-700 gap-1 text-[11px] px-2 justify-center"
-                  title={t.copyAllResultsForAI}
-                >
-                  <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span class="truncate">{currentLang === 'en' ? 'Full Data' : currentLang === 'id' ? 'Teks Lengkap' : 'كامل النصوص'}</span>
-                </button>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-stone-400 font-mono">{searchData.results.length} {t.passages}</span>
+                  <span class="w-5 h-5 flex items-center justify-center rounded-md bg-stone-800 text-stone-300 transition-transform duration-200 chevron-icon rotate-180">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+              </button>
 
-                <!-- Button 2: Copy Page URL -->
-                <button
-                  type="button"
-                  id="copy-page-url-btn"
-                  class="btn btn-sm bg-emerald-700 hover:bg-emerald-800 text-white font-bold border-0 gap-1 text-[11px] px-2 justify-center"
-                  title={t.copyPageUrlForAI}
-                >
-                  <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <span class="truncate">{currentLang === 'en' ? 'Page URL' : currentLang === 'id' ? 'Tautan URL' : 'رابط الصفحة'}</span>
-                </button>
+              <!-- Collapsible Body -->
+              <div id="card-body-ai" class="space-y-3 pt-2 border-t border-stone-800">
+                <!-- Side-by-Side Copy Buttons -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <!-- Button 1: Copy Full Dataset -->
+                  <button
+                    type="button"
+                    id="copy-all-results-btn-sidebar"
+                    class="btn btn-sm bg-stone-800 hover:bg-stone-700 text-emerald-300 font-bold border border-stone-700 gap-1 text-[11px] px-2 justify-center"
+                    title={t.copyAllResultsForAI}
+                  >
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span class="truncate">{currentLang === 'en' ? 'Full Data' : currentLang === 'id' ? 'Teks Lengkap' : 'كامل النصوص'}</span>
+                  </button>
+
+                  <!-- Button 2: Copy Page URL -->
+                  <button
+                    type="button"
+                    id="copy-page-url-btn"
+                    class="btn btn-sm bg-emerald-700 hover:bg-emerald-800 text-white font-bold border-0 gap-1 text-[11px] px-2 justify-center"
+                    title={t.copyPageUrlForAI}
+                  >
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span class="truncate">{currentLang === 'en' ? 'Page URL' : currentLang === 'id' ? 'Tautan URL' : 'رابط الصفحة'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          <!-- 3. Reading & Display Controls Card (Placed Last with i18n support) -->
+          <!-- ======================================================== -->
+          <!-- 4. READING & DISPLAY CONTROLS CARD (Self-Collapsible)    -->
+          <!-- ======================================================== -->
           {searchData && searchData.results.length > 0 && (
             <SearchControls client:load lang={currentLang} />
           )}
@@ -316,9 +552,71 @@ const allResultsAIPrompt = searchData
     </div>
   </div>
 
-  <!-- Client Script for Smooth Scrolling and Copy Buttons -->
-  <script define:vars={{ allResultsAIPrompt, copiedText: t.copied }}>
-    // 1. Smooth Scroll for Thematic Navigation Anchors
+  <!-- Client Script for Smooth Scrolling, Copy Buttons, and Collapsible Sidebar Persistence -->
+  <script define:vars={{ allResultsAIPrompt, copiedText: t.copied, hasActiveFilters }}>
+    // 1. Sidebar Card Collapse Manager with localStorage persistence
+    const STORAGE_KEY = 'openbayan_sidebar_cards_state';
+    
+    function getCardStates() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+      // Default: facets closed (unless active filters present), thematic open, ai open
+      return {
+        facets: hasActiveFilters ? true : false,
+        thematic: true,
+        ai: true
+      };
+    }
+
+    function saveCardState(cardKey, isOpen) {
+      try {
+        const current = getCardStates();
+        current[cardKey] = isOpen;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      } catch (e) {}
+    }
+
+    function initCollapsibleCards() {
+      const states = getCardStates();
+      // If user has active filters on current search, ensure facets is visible
+      if (hasActiveFilters) states.facets = true;
+
+      ['facets', 'thematic', 'ai'].forEach(key => {
+        const body = document.getElementById(`card-body-${key}`);
+        const btn = document.querySelector(`[data-toggle-collapse="${key}"]`);
+        const chevron = btn ? btn.querySelector('.chevron-icon') : null;
+        
+        if (body && btn) {
+          const isOpen = states[key] !== undefined ? states[key] : (key !== 'facets');
+          
+          if (isOpen) {
+            body.classList.remove('hidden');
+            if (chevron) chevron.classList.add('rotate-180');
+          } else {
+            body.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+          }
+
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const nowHidden = body.classList.toggle('hidden');
+            const nowOpen = !nowHidden;
+            if (chevron) {
+              if (nowOpen) chevron.classList.add('rotate-180');
+              else chevron.classList.remove('rotate-180');
+            }
+            saveCardState(key, nowOpen);
+          });
+        }
+      });
+    }
+
+    // Initialize collapses
+    initCollapsibleCards();
+
+    // 2. Smooth Scroll for Thematic Navigation Anchors
     document.querySelectorAll('[data-smooth-scroll]').forEach(anchor => {
       anchor.addEventListener('click', (e) => {
         e.preventDefault();
@@ -343,7 +641,7 @@ const allResultsAIPrompt = searchData
       }
     }
 
-    // 2. Copy Full Corpus Results
+    // 3. Copy Full Corpus Results
     const copyAllSidebarBtn = document.getElementById('copy-all-results-btn-sidebar');
     if (copyAllSidebarBtn) {
       copyAllSidebarBtn.addEventListener('click', () => {
@@ -352,7 +650,7 @@ const allResultsAIPrompt = searchData
       });
     }
 
-    // 3. Copy Page URL
+    // 4. Copy Page URL
     const pageUrlBtn = document.getElementById('copy-page-url-btn');
     if (pageUrlBtn) {
       pageUrlBtn.addEventListener('click', () => {

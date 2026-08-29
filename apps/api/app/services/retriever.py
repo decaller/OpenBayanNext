@@ -1,83 +1,118 @@
 import time
-import asyncio
-from typing import List, Dict, Tuple, Optional, Any
+import re
+from typing import List, Optional, Dict, Any
 import numpy as np
-import libsql_client
-
-from app.core.database import db
+from app.core.database import get_db_client
+from app.schemas.search import SearchResponse, SearchResultItem
 from app.core.vectorizer import vectorizer
-from app.services.query_expander import build_fts5_query
 from app.services.merger import merge_contiguous_siblings
-from app.schemas.search import SearchResultItem, SearchResponse
+from app.services.citation_router import parse_scripture_citation, resolve_pinned_citation
 
 class VectorMatrixCache:
     """
-    RAM-Cached In-Memory Vector Matrix for ultra-fast semantic fallback search.
-    Stores normalized float32 matrix V in R^(N x 768) and chunk_id index mappings.
+    In-memory Dense Vector Matrix for ultra-low-latency semantic retrieval (<4ms).
+    Holds normalized vectors in a contiguous NumPy array.
     """
     def __init__(self):
-        self.chunk_ids: np.ndarray = np.array([], dtype=np.int64)
+        self.chunk_ids: List[int] = []
         self.matrix: Optional[np.ndarray] = None
-        self._is_loaded: bool = False
+        self.is_loaded: bool = False
 
-    async def load(self, client: libsql_client.Client):
-        if self._is_loaded:
+    async def load_if_needed(self):
+        if self.is_loaded:
             return
+        client = await get_db_client()
         t0 = time.perf_counter()
-        sql = "SELECT chunk_id, embedding FROM prepared_chunks WHERE embedding IS NOT NULL ORDER BY chunk_id ASC"
-        res = await client.execute(sql)
         
-        if not res.rows:
-            # Fallback if embeddings are synthetic or not populated yet
-            self._is_loaded = True
-            return
-
-        c_ids = []
-        vec_list = []
+        # Load pre-computed 768-dim embeddings from SQLite
+        res = await client.execute("SELECT chunk_id, embedding FROM prepared_chunks WHERE embedding IS NOT NULL")
+        chunk_ids = []
+        vectors = []
+        
         for row in res.rows:
             c_id, blob = row[0], row[1]
-            if blob and len(blob) == 3072:
+            if blob and len(blob) == 3072: # 768 * 4 bytes float32
                 vec = np.frombuffer(blob, dtype="<f4")
-                norm = np.linalg.norm(vec)
-                if norm > 0:
-                    vec = vec / norm
-                c_ids.append(c_id)
-                vec_list.append(vec)
+                chunk_ids.append(c_id)
+                vectors.append(vec)
 
-        if vec_list:
-            self.chunk_ids = np.array(c_ids, dtype=np.int64)
-            self.matrix = np.vstack(vec_list).astype("<f4") # (N, 768)
-            t1 = time.perf_counter()
-            print(f"✓ Cached {len(c_ids)} dense vectors into RAM matrix in {(t1-t0)*1000:.2f} ms ({self.matrix.nbytes / (1024*1024):.1f} MB)")
-        self._is_loaded = True
+        if vectors:
+            self.chunk_ids = chunk_ids
+            self.matrix = np.vstack(vectors).astype(np.float32)
+            self.is_loaded = True
+            took_ms = (time.perf_counter() - t0) * 1000
+            print(f"✓ Cached {len(chunk_ids)} dense vectors into RAM matrix in {took_ms:.2f} ms ({self.matrix.nbytes / (1024*1024):.1f} MB)")
 
-    def semantic_search(self, query_vec: np.ndarray, top_k: int = 50) -> List[Tuple[int, float]]:
-        """Matrix dot product s = V . q in ~2.5 ms."""
+    def semantic_search(self, query_vec: np.ndarray, top_k: int = 40) -> List[tuple[int, float]]:
         if self.matrix is None or len(self.chunk_ids) == 0:
             return []
-        # Cosine similarity via dot product (both V and q are unit normalized)
-        scores = np.dot(self.matrix, query_vec)
-        top_indices = np.argpartition(scores, -top_k)[-top_k:]
-        top_sorted = top_indices[np.argsort(-scores[top_indices])]
-        return [(int(self.chunk_ids[i]), float(scores[i])) for i in top_sorted]
+        # Matrix-vector dot product (cosine similarity since normalized)
+        sims = np.dot(self.matrix, query_vec)
+        top_indices = np.argpartition(sims, -top_k)[-top_k:]
+        top_indices = top_indices[np.argsort(-sims[top_indices])]
+        
+        return [(self.chunk_ids[idx], float(sims[idx])) for idx in top_indices]
 
 vector_matrix_cache = VectorMatrixCache()
 
-async def hybrid_search(
+async def search_hybrid(
     query: str,
     page: int = 1,
-    limit: int = 20,
+    limit: int = 60,
     mode: str = "hybrid",
-    merge_siblings: bool = True,
-    book_ids: Optional[List[int]] = None
+    book_ids: Optional[List[int]] = None,
+    category: Optional[str] = None,
+    era: Optional[str] = None,
+    tradition: Optional[str] = None,
+    merge_siblings: bool = True
 ) -> SearchResponse:
+    """
+    Executes high-performance hybrid retrieval combining CTE-driven SQLite FTS5 BM25,
+    dense vector re-ranking, faceted metadata predicates, and citation routing interceptor.
+    """
     t_start = time.perf_counter()
-    client = db.client
+    client = await get_db_client()
 
-    # 1. Expand Morphological Query for FTS5
-    expanded_fts_expr = build_fts5_query(query)
+    # Pre-warm vector cache
+    await vector_matrix_cache.load_if_needed()
+
+    # 1. Check Scripture Citation Interceptor (Ayah / Hadith lookup)
+    pinned_citation = None
+    citation_meta = parse_scripture_citation(query)
+    if citation_meta:
+        pinned_citation = await resolve_pinned_citation(citation_meta)
+
+    # 2. Build Query Formulations & Morphological Root Expansion
+    clean_query = re.sub(r"[^\u0621-\u064A0-9\s]", " ", query).strip()
+    query_tokens = [t for t in clean_query.split() if len(t) > 1]
     
-    # 2. Embed Query Vector (Fast CPU ONNX)
+    expanded_fts_expr = None
+    if query_tokens:
+        fts_terms = []
+        for t in query_tokens:
+            bare_t = re.sub(r"^(ال|بال|كال|فال|لل|وال)", "", t)
+            if len(bare_t) >= 3:
+                fts_terms.append(f'("{t}"* OR "{bare_t}"*)')
+            else:
+                fts_terms.append(f'"{t}"*')
+        expanded_fts_expr = " AND ".join(fts_terms)
+
+    # 3. Resolve Era Hijri bounds
+    min_hijri = None
+    max_hijri = None
+    if era == "early":
+        max_hijri = 300
+    elif era == "classical":
+        min_hijri = 301
+        max_hijri = 700
+    elif era == "late":
+        min_hijri = 701
+
+    # Normalize category / tradition
+    filter_category = category if category and category != "all" else None
+    filter_tradition = tradition if tradition and tradition != "all" else None
+
+    # 4. Embed Query Vector (Fast CPU ONNX)
     query_vec = None
     if mode in ("hybrid", "vector"):
         try:
@@ -86,11 +121,10 @@ async def hybrid_search(
             print(f"⚠️ Vectorizer error: {e}, falling back to pure BM25")
             mode = "fts"
 
-    # 3. Step 1: Execute FTS5 Search
+    # 5. Execute CTE-driven FTS5 Search with Pushed-Down Relational Facet Filters
     fts_candidates: Dict[int, Dict[str, Any]] = {}
     fts_ranks: Dict[int, int] = {}
-
-    fetch_buffer_k = max(min(limit * 3, 60), 30)
+    fetch_buffer_k = max(min(limit * 3, 100), 40)
 
     if expanded_fts_expr and mode in ("hybrid", "fts"):
         book_filter = ""
@@ -101,17 +135,35 @@ async def hybrid_search(
             params.extend(book_ids)
             
         sql_fts = f"""
+        WITH fts_matches AS (
+            SELECT rowid AS chunk_id, rank AS bm25_rank
+            FROM prepared_chunks_fts
+            WHERE prepared_chunks_fts MATCH ?
+            LIMIT 150
+        )
         SELECT 
-            p.chunk_id, p.book_id, p.book_name, p.volume_page, p.chunk_order,
+            p.chunk_id, p.book_id, b.title_ar, p.volume_page, p.chunk_order,
             p.section_id, p.section_title, p.breadcrumb, p.raw_text, p.footnotes,
-            p.embedding, f.rank
-        FROM prepared_chunks_fts f
-        JOIN prepared_chunks p ON p.chunk_id = f.rowid
-        WHERE prepared_chunks_fts MATCH ?
-        {book_filter}
-        ORDER BY f.rank
-        LIMIT {fetch_buffer_k}
+            p.is_section_start, b.category_name, b.author_name, b.author_death_hijri,
+            b.tradition, b.era_tag, p.embedding, m.bm25_rank
+        FROM fts_matches m
+        JOIN prepared_chunks p ON m.chunk_id = p.chunk_id
+        JOIN books b ON p.book_id = b.book_id
+        WHERE (? IS NULL OR b.category_name = ?)
+          AND (? IS NULL OR b.author_death_hijri >= ?)
+          AND (? IS NULL OR b.author_death_hijri <= ?)
+          AND (? IS NULL OR b.tradition = ?)
+          {book_filter}
+        ORDER BY m.bm25_rank
+        LIMIT {fetch_buffer_k};
         """
+        params.extend([
+            filter_category, filter_category,
+            min_hijri, min_hijri,
+            max_hijri, max_hijri,
+            filter_tradition, filter_tradition
+        ])
+
         try:
             res_fts = await client.execute(sql_fts, params)
             for rank_idx, row in enumerate(res_fts.rows, 1):
@@ -128,19 +180,24 @@ async def hybrid_search(
                     "breadcrumb": row[7],
                     "raw_text": row[8],
                     "footnotes": row[9],
-                    "embedding": row[10],
-                    "bm25_rank": row[11],
-                    "bm25_score": -float(row[11]) if row[11] is not None else 0.0,
+                    "is_section_start": bool(row[10]),
+                    "category_name": row[11],
+                    "author_name": row[12],
+                    "author_death_hijri": row[13],
+                    "author_tradition": row[14],
+                    "era_tag": row[15],
+                    "embedding": row[16],
+                    "bm25_rank": row[17],
+                    "bm25_score": -float(row[17]) if row[17] is not None else 0.0,
                     "vector_score": 0.0
                 }
         except Exception as e:
             print(f"⚠️ FTS query execution failed: {e}")
 
-    # 4. Dual-Path Vector Re-ranking / Semantic Fallback
+    # 6. Dual-Path Vector Re-ranking / Semantic Fallback
     vec_ranks: Dict[int, int] = {}
     
     if mode in ("hybrid", "vector") and query_vec is not None:
-        # Path A: Re-rank FTS candidates if we have enough hits
         if len(fts_candidates) >= 10:
             scored_candidates = []
             for c_id, item in fts_candidates.items():
@@ -159,28 +216,44 @@ async def hybrid_search(
             for r_idx, (c_id, _) in enumerate(scored_candidates, 1):
                 vec_ranks[c_id] = r_idx
 
-        # Path B: Fallback to full RAM matrix if FTS yielded < 10 hits
+        # Semantic fallback to in-memory matrix
         elif vector_matrix_cache.matrix is not None and len(vector_matrix_cache.chunk_ids) > 0:
             semantic_hits = vector_matrix_cache.semantic_search(query_vec, top_k=fetch_buffer_k)
             for r_idx, (c_id, sim) in enumerate(semantic_hits, 1):
                 vec_ranks[c_id] = r_idx
                 if c_id not in fts_candidates:
-                    # Fetch missing row details
                     row_res = await client.execute("""
-                        SELECT chunk_id, book_id, book_name, volume_page, chunk_order,
-                               section_id, section_title, breadcrumb, raw_text, footnotes
-                        FROM prepared_chunks WHERE chunk_id = ?
-                    """, [c_id])
+                        SELECT p.chunk_id, p.book_id, b.title_ar, p.volume_page, p.chunk_order,
+                               p.section_id, p.section_title, p.breadcrumb, p.raw_text, p.footnotes,
+                               p.is_section_start, b.category_name, b.author_name, b.author_death_hijri,
+                               b.tradition, b.era_tag
+                        FROM prepared_chunks p
+                        JOIN books b ON p.book_id = b.book_id
+                        WHERE p.chunk_id = ?
+                          AND (? IS NULL OR b.category_name = ?)
+                          AND (? IS NULL OR b.author_death_hijri >= ?)
+                          AND (? IS NULL OR b.author_death_hijri <= ?)
+                          AND (? IS NULL OR b.tradition = ?)
+                    """, [
+                        c_id,
+                        filter_category, filter_category,
+                        min_hijri, min_hijri,
+                        max_hijri, max_hijri,
+                        filter_tradition, filter_tradition
+                    ])
                     if row_res.rows:
                         r = row_res.rows[0]
                         fts_candidates[c_id] = {
                             "chunk_id": r[0], "book_id": r[1], "book_name": r[2],
                             "volume_page": r[3], "chunk_order": r[4], "section_id": r[5],
                             "section_title": r[6], "breadcrumb": r[7], "raw_text": r[8],
-                            "footnotes": r[9], "bm25_score": None, "vector_score": sim
+                            "footnotes": r[9], "is_section_start": bool(r[10]),
+                            "category_name": r[11], "author_name": r[12],
+                            "author_death_hijri": r[13], "author_tradition": r[14],
+                            "era_tag": r[15], "bm25_score": None, "vector_score": sim
                         }
 
-    # 5. Compute Reciprocal Rank Fusion (RRF) Scores (k=60)
+    # 7. Compute Reciprocal Rank Fusion (RRF) Scores (k=60)
     all_candidate_ids = set(fts_candidates.keys())
     scored_items: List[SearchResultItem] = []
 
@@ -207,6 +280,11 @@ async def hybrid_search(
             chunk_id=item["chunk_id"],
             book_id=item["book_id"],
             book_name=item["book_name"],
+            author_name=item.get("author_name"),
+            author_death_hijri=item.get("author_death_hijri"),
+            category_name=item.get("category_name"),
+            author_tradition=item.get("author_tradition"),
+            era_tag=item.get("era_tag"),
             volume_page=item["volume_page"],
             chunk_order=item["chunk_order"],
             section_id=item["section_id"],
@@ -219,6 +297,7 @@ async def hybrid_search(
             vector_score=item.get("vector_score"),
             rrf_score=rrf,
             is_merged=False,
+            is_section_start=item.get("is_section_start", False),
             merged_chunk_ids=[item["chunk_id"]],
             merged_page_range=None
         )
@@ -227,32 +306,27 @@ async def hybrid_search(
     # Sort candidates by RRF score descending
     scored_items.sort(key=lambda x: x.rrf_score, reverse=True)
 
-    # 6. Apply Contiguous Sibling Merger
+    # 8. Apply Contiguous Sibling Merger
     if merge_siblings:
         final_items = merge_contiguous_siblings(scored_items, continuity_bonus=1.05)
     else:
         final_items = scored_items
 
-    # 7. Apply Pagination (page, limit)
+    # 9. Apply Result Limiting
     total_hits = len(final_items)
-    offset = (page - 1) * limit
-    paginated_results = final_items[offset:offset + limit]
+    paginated_results = final_items[:limit]
 
-    # 8. Enrich Paginated Results with Author metadata and Preceding/Succeeding Chunks (N-1, N+1)
+    # 10. Enrich Results with Surrounding Preceding/Succeeding Chunks (N-1, N+1)
     for p_item in paginated_results:
         try:
             n_res = await client.execute("""
-                SELECT p.chunk_id, p.chunk_order, p.raw_text, b.author_name, b.author_death_hijri
-                FROM prepared_chunks p
-                JOIN books b ON p.book_id = b.book_id
-                WHERE p.book_id = ? AND p.chunk_order IN (?, ?, ?)
-            """, [p_item.book_id, p_item.chunk_order - 1, p_item.chunk_order, p_item.chunk_order + 1])
+                SELECT chunk_id, chunk_order, raw_text
+                FROM prepared_chunks
+                WHERE book_id = ? AND chunk_order IN (?, ?)
+            """, [p_item.book_id, p_item.chunk_order - 1, p_item.chunk_order + 1])
             
             for nrow in n_res.rows:
-                c_id, c_order, c_text, auth_name, auth_death = nrow[0], nrow[1], nrow[2], nrow[3], nrow[4]
-                if not p_item.author_name:
-                    p_item.author_name = auth_name
-                    p_item.author_death_hijri = auth_death
+                c_id, c_order, c_text = nrow[0], nrow[1], nrow[2]
                 if c_order == p_item.chunk_order - 1:
                     p_item.preceding_chunk_id = c_id
                     p_item.preceding_text = c_text
@@ -260,7 +334,7 @@ async def hybrid_search(
                     p_item.succeeding_chunk_id = c_id
                     p_item.succeeding_text = c_text
         except Exception as e:
-            print(f"⚠️ Warning: context enrichment failed for chunk {p_item.chunk_id}: {e}")
+            print(f"⚠️ Context enrichment failed for chunk {p_item.chunk_id}: {e}")
 
     t_end = time.perf_counter()
     took_ms = (t_end - t_start) * 1000
@@ -269,9 +343,13 @@ async def hybrid_search(
         query=query,
         expanded_fts_query=expanded_fts_expr,
         mode=mode,
+        category=category,
+        era=era,
+        tradition=tradition,
         page=page,
         limit=limit,
         total_hits=total_hits,
         took_ms=round(took_ms, 3),
+        pinned_citation=pinned_citation,
         results=paginated_results
     )

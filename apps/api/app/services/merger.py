@@ -12,13 +12,12 @@ def merge_contiguous_siblings(
     Score formula:
         Score_merged = max(Score_A, Score_B) * 1.05
         
-    Concatenates text with a clear page break delimiter and combines page labels.
+    Concatenates text with a clear page break delimiter and combines page labels,
+    while preserving all author, category, tradition, and section start metadata.
     """
     if not items:
         return []
 
-    # Group items by book_id preserving initial relevance ranking
-    # But to find contiguous runs, we inspect pairs belonging to the same book
     merged: List[SearchResultItem] = []
     consumed = set()
 
@@ -79,6 +78,11 @@ def merge_contiguous_siblings(
             chunk_id=current.chunk_id,
             book_id=current.book_id,
             book_name=current.book_name,
+            author_name=current.author_name,
+            author_death_hijri=current.author_death_hijri,
+            category_name=current.category_name,
+            author_tradition=current.author_tradition,
+            era_tag=current.era_tag,
             volume_page=page_range_str,
             chunk_order=current.chunk_order,
             section_id=current.section_id,
@@ -91,6 +95,7 @@ def merge_contiguous_siblings(
             vector_score=max_vec,
             rrf_score=max_rrf,
             is_merged=is_merged,
+            is_section_start=current.is_section_start,
             merged_chunk_ids=merged_ids if is_merged else [current.chunk_id],
             merged_page_range=page_range_str if is_merged else None
         )

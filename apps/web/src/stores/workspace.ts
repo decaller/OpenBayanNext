@@ -12,17 +12,40 @@ export interface ActiveSectionState {
 export type FontSizeOption = 'sm' | 'base' | 'lg' | 'xl';
 export type ContextDepth = 1 | 2;
 
+// Load persisted settings from localStorage helper
+function getStored<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const val = localStorage.getItem(key);
+    if (val !== null) {
+      return JSON.parse(val) as T;
+    }
+  } catch (e) {
+    // Fallback to default
+  }
+  return defaultValue;
+}
+
+function setStored<T>(key: string, value: T) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    // Storage quota or disabled
+  }
+}
+
 export const $isDrawerOpen = atom<boolean>(false);
 export const $activeSection = atom<ActiveSectionState | null>(null);
 export const $fontSize = atom<FontSizeOption>('base');
 export const $currentLang = atom<SupportedLanguage>('ar');
 export const $toastMessage = atom<string | null>(null);
 
-// Search Results Reading & Display Controls
-export const $showHighlights = atom<boolean>(true);
-export const $chunkFontSize = atom<FontSizeOption>('base');
-export const $isCompact = atom<boolean>(false);
-export const $contextDepth = atom<ContextDepth>(1);
+// Search Results Reading & Display Controls (persisted in localStorage)
+export const $showHighlights = atom<boolean>(getStored('openbayan_pref_highlights', true));
+export const $chunkFontSize = atom<FontSizeOption>(getStored('openbayan_pref_fontsize', 'base'));
+export const $isCompact = atom<boolean>(getStored('openbayan_pref_compact', false));
+export const $contextDepth = atom<ContextDepth>(getStored('openbayan_pref_depth', 1));
 
 export function showToast(message: string, durationMs: number = 3000) {
   $toastMessage.set(message);
@@ -43,28 +66,32 @@ export function setLanguage(lang: SupportedLanguage) {
 }
 
 export function toggleHighlights() {
-  const current = $showHighlights.get();
-  $showHighlights.set(!current);
+  const next = !$showHighlights.get();
+  $showHighlights.set(next);
+  setStored('openbayan_pref_highlights', next);
   updateDisplayClasses();
 }
 
 export function setChunkFontSize(size: FontSizeOption) {
   $chunkFontSize.set(size);
+  setStored('openbayan_pref_fontsize', size);
   updateDisplayClasses();
 }
 
 export function toggleCompactView() {
-  const current = $isCompact.get();
-  $isCompact.set(!current);
+  const next = !$isCompact.get();
+  $isCompact.set(next);
+  setStored('openbayan_pref_compact', next);
   updateDisplayClasses();
 }
 
 export function setContextDepth(depth: ContextDepth) {
   $contextDepth.set(depth);
+  setStored('openbayan_pref_depth', depth);
   updateDisplayClasses();
 }
 
-function updateDisplayClasses() {
+export function updateDisplayClasses() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('search-results-container');
   if (!container) return;
@@ -105,8 +132,17 @@ export function closeChapterDrawer() {
   $isDrawerOpen.set(false);
 }
 
-// Global browser popstate & Escape key invariant
+// Global browser listeners and initial settings sync
 if (typeof window !== 'undefined') {
+  // Sync display classes on initial page load
+  window.addEventListener('DOMContentLoaded', () => {
+    updateDisplayClasses();
+  });
+  // Execute immediately if DOM already loaded
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    updateDisplayClasses();
+  }
+
   window.addEventListener('popstate', () => {
     if ($isDrawerOpen.get()) {
       $isDrawerOpen.set(false);

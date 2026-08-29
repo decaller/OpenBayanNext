@@ -27,6 +27,13 @@ const highlightedSucceeding = chunk.succeeding_text
   ? highlightQueryTerms(chunk.succeeding_text.slice(0, 260) + '...', searchQuery)
   : null;
 
+// Tradition label formatter
+const traditionLabel = chunk.author_tradition === 'athari_salafi' 
+  ? t.traditionAthariSalafi 
+  : chunk.author_tradition === 'classical_jumhur' 
+    ? t.traditionClassicalJumhur 
+    : null;
+
 // External Library URLs based on book_id and chunk_id
 const turathUrl = `https://turath.io/book/${chunk.book_id}`;
 const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
@@ -51,6 +58,14 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
         <span class="badge badge-sm badge-ghost font-mono">
           {chunk.volume_page}
         </span>
+        
+        {chunk.is_section_start && (
+          <span class="badge badge-xs bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 font-bold gap-1 text-[10px]">
+            <span>📖</span>
+            <span>{t.sectionStartBadge}</span>
+          </span>
+        )}
+
         {chunk.is_merged && (
           <span class="badge badge-xs badge-success badge-outline">
             {t.consecutivePages}
@@ -172,8 +187,11 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
       <!-- Left: External Library Badges & Author -->
       <div class="flex items-center gap-1.5 flex-wrap text-xs">
         {chunk.author_name && (
-          <span class="text-[11px] text-base-content/60 me-1">
-            <strong>{chunk.author_name}</strong> {chunk.author_death_hijri && `(ت: ${chunk.author_death_hijri} هـ)`} •
+          <span class="text-[11px] text-base-content/70 me-1">
+            <strong>{chunk.author_name}</strong> {chunk.author_death_hijri && `(ت: ${chunk.author_death_hijri} هـ)`}
+            {chunk.category_name && <span class="badge badge-xs badge-ghost ms-1">{chunk.category_name}</span>}
+            {traditionLabel && <span class="badge badge-xs badge-outline ms-1 text-emerald-800 dark:text-emerald-400">{traditionLabel}</span>}
+            •
           </span>
         )}
         <span class="text-[11px] text-base-content/50 hidden sm:inline">{t.onlineBook}</span>
@@ -206,6 +224,10 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
           data-copy-ai
           data-chunk-id={chunk.chunk_id}
           data-book-name={chunk.book_name}
+          data-author-name={chunk.author_name || ''}
+          data-author-death-hijri={chunk.author_death_hijri || ''}
+          data-category-name={chunk.category_name || ''}
+          data-author-tradition={chunk.author_tradition || ''}
           data-volume-page={chunk.volume_page}
           data-breadcrumb={chunk.breadcrumb}
           data-raw-text={chunk.full_text || rawSnippet}

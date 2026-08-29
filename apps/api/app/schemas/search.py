@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
 
 class SearchResultItem(BaseModel):
@@ -7,6 +7,9 @@ class SearchResultItem(BaseModel):
     book_name: str
     author_name: Optional[str] = None
     author_death_hijri: Optional[int] = None
+    category_name: Optional[str] = None
+    author_tradition: Optional[str] = None
+    era_tag: Optional[str] = None
     volume_page: str
     chunk_order: int
     section_id: str
@@ -19,6 +22,7 @@ class SearchResultItem(BaseModel):
     vector_score: Optional[float] = None
     rrf_score: float
     is_merged: bool = False
+    is_section_start: bool = False
     merged_chunk_ids: List[int] = Field(default_factory=list)
     merged_page_range: Optional[str] = None
     preceding_chunk_id: Optional[int] = None
@@ -28,21 +32,25 @@ class SearchResultItem(BaseModel):
 
 class SearchResponse(BaseModel):
     query: str
-    expanded_fts_query: str
+    expanded_fts_query: Optional[str] = None
     mode: str
+    category: Optional[str] = None
+    era: Optional[str] = None
+    tradition: Optional[str] = None
     page: int
     limit: int
     total_hits: int
     took_ms: float
+    pinned_citation: Optional[Dict[str, Any]] = None
     results: List[SearchResultItem]
 
 class ChunkDetailResponse(BaseModel):
     chunk_id: int
     book_id: int
     book_name: str
-    author_name: str
-    author_death_hijri: int
-    category_name: str
+    author_name: Optional[str] = None
+    author_death_hijri: Optional[int] = None
+    category_name: Optional[str] = None
     volume_page: str
     chunk_order: int
     section_id: str
@@ -60,9 +68,9 @@ class SurroundingContextItem(BaseModel):
     section_title: str
     raw_text: str
     footnotes: Optional[str] = None
-    is_focus_chunk: bool = False
-    is_same_section: bool = True
-    is_same_book: bool = True
+    is_focus_chunk: bool
+    is_same_section: bool
+    is_same_book: bool
 
 class SurroundingContextResponse(BaseModel):
     focus_chunk_id: int
@@ -79,7 +87,7 @@ class ChapterChunkItem(BaseModel):
     chunk_order: int
     raw_text: str
     footnotes: Optional[str] = None
-    is_section_start: bool = False
+    is_section_start: bool
 
 class ChapterStreamResponse(BaseModel):
     book_id: int
@@ -94,16 +102,16 @@ class BookSummaryItem(BaseModel):
     book_id: int
     shamela_id: Optional[int] = None
     title_ar: str
-    author_name: str
-    author_death_hijri: int
-    category_name: str
-    chunk_count: int
+    author_name: Optional[str] = None
+    author_death_hijri: Optional[int] = None
+    category_name: Optional[str] = None
+    chunk_count: int = 0
 
 class TOCNodeItem(BaseModel):
     section_id: str
     parent_id: Optional[str] = None
     title_text: str
     section_level: int
-    start_page_id: int
+    start_page_id: Optional[int] = None
     breadcrumb: str
     children: List['TOCNodeItem'] = Field(default_factory=list)
