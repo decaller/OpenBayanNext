@@ -62,3 +62,7 @@ Thumbs.db
 # Audit Artifacts
 audit/screenshots/
 
+# Handoff Documentation
+HANDOFF.md
+
+
