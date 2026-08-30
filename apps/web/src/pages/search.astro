@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import PassageCard from '../components/astro/PassageCard.astro';
 import { SearchBar } from '../components/islands/SearchBar';
 import { SearchControls } from '../components/islands/SearchControls';
-import { INTERNAL_API_URL, type SearchResponse } from '../lib/api';
+import { getApiUrl, type SearchResponse } from '../lib/api';
 import { translations, getLangFromUrl, formatAllSearchResultsPrompt } from '../lib/i18n';
 import { clusterSearchResults } from '../lib/thematic_clusterer';
 import { createFacetUrl } from '../lib/url';
@@ -35,7 +35,8 @@ if (query.trim()) {
     if (era) params.set('era', era);
     if (tradition) params.set('tradition', tradition);
 
-    const fetchUrl = `${INTERNAL_API_URL}/search?${params.toString()}`;
+    const apiUrl = getApiUrl(true);
+    const fetchUrl = `${apiUrl}/search?${params.toString()}`;
     const res = await fetch(fetchUrl);
     if (res.ok) {
       searchData = await res.json();

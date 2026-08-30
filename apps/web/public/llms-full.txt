@@ -1,0 +1,80 @@
+# OpenBayan Classical Arabic Corpus Engine - Full Technical Specification
+
+> Comprehensive bibliographic directory, query syntax, and machine-readable protocol for autonomous AI agents.
+
+## 1. Corpus Overview & Canonical Masterworks (60 Works)
+
+OpenBayan indexes 60 foundational masterworks across primary Islamic disciplines (76,274 passages / 97,533 hierarchy nodes):
+
+### Hadith & Sunnah (كتب السنة)
+- **صحيح البخاري** (ن عطاءات العلم / ط التأصيل / ط السلطانية) - الإمام البخاري (ت 256 هـ)
+- **صحيح مسلم** - الإمام مسلم (ت 261 هـ)
+- **سنن أبي داود** - الإمام أبو داود (ت 275 هـ)
+- **جامع الترمذي** - الإمام الترمذي (ت 279 هـ)
+- **سنن النسائي الصغرى (المجتبى)** - الإمام النسائي (ت 303 هـ)
+- **سنن ابن ماجه** - الإمام ابن ماجه (ت 273 هـ)
+- **موطأ مالك** (رواية يحيى الليثي / رواية أبي مصعب) - الإمام مالك (ت 179 هـ)
+- **مسند الإمام أحمد بن حنبل** - الإمام أحمد بن حنبل (ت 241 هـ)
+- **سنن الدارمي** - الإمام الدارمي (ت 255 هـ)
+
+### Hadith Commentary (شروح الحديث)
+- **فتح الباري شرح صحيح البخاري** - الحافظ ابن حجر العسقلاني (ت 852 هـ)
+- **عمدة القاري شرح صحيح البخاري** - الإمام بدر الدين العيني (ت 855 هـ)
+- **المنهاج شرح صحيح مسلم بن الحجاج** - الإمام النووي (ت 676 هـ)
+- **إرشاد الساري لشرح صحيح البخاري** - الإمام القسطلاني (ت 923 هـ)
+- **عون المعبود شرح سنن أبي داود** - العظيم آبادي (ت 1329 هـ)
+- **تحفة الأحوذي شرح جامع الترمذي** - المباركفوري (ت 1353 هـ)
+
+### Jurisprudence & Legal Theory (الفقه وأصوله)
+- **الأم** - الإمام الشافعي (ت 204 هـ)
+- **المجموع شرح المهذب** - الإمام النووي (ت 676 هـ)
+- **تكملة المجموع شرح المهذب** - الإمام السبكي (ت 756 هـ)
+- **المدونة** - الإمام سحنون عن مالك (ت 240 هـ)
+- **بداية المجتهد ونهاية المقتصد** - القاضي ابن رشد الحفيد (ت 595 هـ)
+- **المغني** - الإمام موفق الدين ابن قدامة المقدسي (ت 620 هـ)
+- **بدائع الصنائع في ترتيب الشرائع** - الإمام الكاساني الحنفي (ت 587 هـ)
+- **حاشية الرد المحتار (ابن عابدين)** - ابن عابدين (ت 1252 هـ)
+
+### Quranic Exegesis (التفسير وعلوم القرآن)
+- **جامع البيان عن تأويل آي القرآن (تفسير الطبري)** - الإمام ابن جرير الطبري (ت 310 هـ)
+- **تفسير القرآن العظيم (تفسير ابن كثير)** - الحافظ ابن كثير (ت 774 هـ)
+- **الجامع لأحكام القرآن (تفسير القرطبي)** - الإمام القرطبي (ت 671 هـ)
+- **معالم التنزيل (تفسير البغوي)** - الإمام البغوي (ت 516 هـ)
+- **تفسير الجلالين** - المحلي والسيوطي (ت 911 هـ)
+
+### Creed & Theology (العقيدة)
+- **شرح العقيدة الطحاوية** - ابن أبي العز الحنفي (ت 792 هـ)
+- **العقيدة الواسطية** - شيخ الإسلام ابن تيمية (ت 728 هـ)
+- **الإبانة عن أصول الديانة** - الإمام أبو الحسن الأشعري (ت 324 هـ)
+- **كتاب التوحيد** - الإمام ابن منده (ت 395 هـ)
+- **لمعة الاعتقاد الهادي إلى سبيل الرشاد** - ابن قدامة المقدسي (ت 620 هـ)
+
+---
+
+## 2. Query Formulation & Syntax Rules
+
+The retrieval engine combines **FTS5 Morphological Root Matching** with **Dense ONNX Semantic Embeddings (`multilingual-e5-base`)**:
+
+1. **Exact Scripture Pinning**:
+   - `البقرة: 275` or `2:275` $\to$ Pins Quran Ayah directly with matching Tafsir.
+   - `صحيح البخاري: 1` $\to$ Directly pins Hadith #1.
+2. **Boolean Search**:
+   - `النية AND العمل` $\to$ Returns passages containing both concepts.
+   - `"بيع السلم"` $\to$ Exact phrase match.
+3. **Cross-Lingual AI Search**:
+   - Supported languages: Arabic, English, Indonesian.
+   - *Note*: Arabic queries trigger both exact root FTS5 matching and dense vectors for 100% precision.
+
+---
+
+## 3. Endpoints for AI Scrapers & Agents
+
+| Purpose | URL Scheme | Format |
+| :--- | :--- | :--- |
+| **Search Query** | `GET /search?q={query}&mode={hybrid|fts|vector}&lang={ar|en|id}` | HTML |
+| **Passage Permalinks** | `GET /p/{chunk_id}` | HTML (0-JS with JSON-LD) |
+| **Raw Markdown Passage** | `GET /p/{chunk_id}.md` | `text/markdown` (Token Efficient) |
+| **Sitemap Index** | `GET /sitemap.xml` | XML |
+| **API Search** | `GET /api/v1/search?q={query}&limit=20` | JSON |
+| **Discourse Triad Context** | `GET /api/v1/chunks/{chunk_id}/surrounding` | JSON |
+| **Chapter Continuous Stream** | `GET /api/v1/books/{book_id}/sections/{section_id}/chunks` | JSON |

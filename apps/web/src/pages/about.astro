@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { translations, getLangFromUrl, type SupportedLanguage } from '../lib/i18n';
-import { INTERNAL_API_URL, type TelemetryStats } from '../lib/api';
+import { getApiUrl, type TelemetryStats } from '../lib/api';
+import { translations, getLangFromUrl } from '../lib/i18n';
 
 const currentLang = getLangFromUrl(Astro.url);
 const t = translations[currentLang];
@@ -18,7 +18,8 @@ let stats: TelemetryStats = {
 };
 
 try {
-  const res = await fetch(`${INTERNAL_API_URL}/telemetry/stats`);
+  const apiUrl = getApiUrl(true);
+  const res = await fetch(`${apiUrl}/telemetry/stats`);
   if (res.ok) {
     stats = await res.json();
   }
@@ -176,20 +177,47 @@ const isId = currentLang === 'id';
       </div>
     </section>
 
-    <!-- Section 2: Corpus Sources & Heritage -->
+    <!-- Section 2: Corpus Sources & Dataset Credits -->
     <section class="space-y-4">
       <h2 class="text-xl sm:text-2xl font-bold text-base-content flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">٢</span>
-        <span>{isAr ? 'مصادر المتون والمكتبة المعتمدة' : isId ? 'Sumber Korpus & Khazanah Kitab' : 'Corpus Sources & Scholarly Heritage'}</span>
+        <span>{isAr ? 'المصادر والبيانات المفتوحة (Hugging Face)' : isId ? 'Sumber Korpus & Dataset Hugging Face' : 'Corpus Sources & Hugging Face Dataset Credits'}</span>
       </h2>
       <p class="text-xs sm:text-sm text-base-content/70 leading-relaxed">
         {isAr
-          ? 'تغطي المنصة حالياً ٦٠ كتاباً من أمهات المتراجع التراثية في مختلف العلوم الشرعية، مستخرجة من أصول رقمية موثوقة:'
+          ? 'تعتمد المنصة على قاعدة بيانات التراث الشاملة والمتجهات الدلالية المستخرجة من مستودع البيانات المفتوح Maktabati/shamela-vectors على منصة Hugging Face، والتي تغطي أكثر من ٨,٥٠٠ كتاب تراثي و١١.٥ مليون مقتطف مع متجهات multilingual-e5-base سابقة الحوسبة:'
           : isId
-          ? 'Platform ini saat ini mengindeks 60 kitab induk rujukan utama dalam keilmuan Islam dari sumber digital terpercaya:'
-          : 'The platform currently indexes 60 canonical masterworks across Islamic disciplines extracted from authoritative digital archives:'
+          ? 'OpenBayan memanfaatkan dataset sumber terbuka Maktabati/shamela-vectors di Hugging Face yang mencakup lebih dari 8.500 kitab warisan Islam dan 11,5 juta kutipan lengkap dengan embedding vektor multilingual-e5-base:'
+          : 'OpenBayan builds upon the open-access dataset Maktabati/shamela-vectors hosted on Hugging Face, encompassing over 8,500 classical Islamic works and 11.5M passages with pre-computed multilingual-e5-base vector embeddings:'
         }
       </p>
+
+      <!-- Hugging Face Dataset Credit Card -->
+      <div class="p-4 rounded-2xl bg-base-100 border border-base-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="space-y-1 text-start">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🤗</span>
+            <span class="font-bold text-sm text-base-content font-mono">Maktabati/shamela-vectors</span>
+            <span class="badge badge-xs badge-success font-bold font-mono">11.5M Passages</span>
+          </div>
+          <p class="text-xs text-base-content/60 leading-relaxed">
+            {isAr
+              ? 'مستودع بيانات شامل مستخرج من المكتبة الشاملة مع تضمينات دلالية 768-dim ونصوص مفهرسة صرفياً.'
+              : isId
+              ? 'Dataset komprehensif khazanah Maktaba Shamela dengan vektor semantik 768-dim dan tokenisasi akar kata.'
+              : 'Comprehensive dataset derived from Maktaba Shamela with 768-dim dense semantic embeddings.'
+            }
+          </p>
+        </div>
+        <a 
+          href="https://huggingface.co/datasets/Maktabati/shamela-vectors" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="btn btn-outline btn-sm rounded-xl gap-2 font-bold font-mono text-xs flex-shrink-0"
+        >
+          <span>Dataset on HF ↗</span>
+        </a>
+      </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div class="p-3.5 rounded-xl bg-base-100 border border-base-200 space-y-1.5">
@@ -336,20 +364,33 @@ const isId = currentLang === 'id';
       </p>
 
       <!-- Maintainer Contact Card -->
-      <div class="p-3.5 rounded-xl bg-base-100 border border-base-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs max-w-md mx-auto">
+      <div class="p-4 rounded-xl bg-base-100 border border-base-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs max-w-lg mx-auto">
         <div class="text-start space-y-0.5">
           <span class="font-bold text-base-content block">Harridi Ilman Tovid</span>
-          <span class="text-base-content/60 font-mono text-[11px]">+62 811-1729-896</span>
+          <div class="flex flex-wrap items-center gap-2 text-base-content/60 font-mono text-[11px]">
+            <span>+62 811-1729-896</span>
+            <span>•</span>
+            <a href="mailto:harridiilmantovid@gmail.com" class="hover:text-primary hover:underline">harridiilmantovid@gmail.com</a>
+          </div>
         </div>
-        <a 
-          href="https://wa.me/628111729896" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          class="btn btn-success btn-xs text-white font-bold gap-1 rounded-lg shadow-xs"
-          title="Chat on WhatsApp: Harridi Ilman Tovid"
-        >
-          <span>💬 WhatsApp</span>
-        </a>
+        <div class="flex items-center gap-2">
+          <a 
+            href="mailto:harridiilmantovid@gmail.com" 
+            class="btn btn-outline btn-xs font-bold gap-1 rounded-lg shadow-xs"
+            title="Email: harridiilmantovid@gmail.com"
+          >
+            <span>✉️ Email</span>
+          </a>
+          <a 
+            href="https://wa.me/628111729896" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="btn btn-success btn-xs text-white font-bold gap-1 rounded-lg shadow-xs"
+            title="Chat on WhatsApp: Harridi Ilman Tovid"
+          >
+            <span>💬 WhatsApp</span>
+          </a>
+        </div>
       </div>
 
       <div class="pt-2 flex flex-wrap items-center justify-center gap-3">
@@ -363,6 +404,12 @@ const isId = currentLang === 'id';
             <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
           </svg>
           <span>decaller/OpenBayanNext</span>
+        </a>
+        <a 
+          href="mailto:harridiilmantovid@gmail.com" 
+          class="btn btn-outline btn-sm rounded-xl gap-2 font-bold"
+        >
+          <span>✉️ harridiilmantovid@gmail.com</span>
         </a>
         <a 
           href="https://wa.me/628111729896" 

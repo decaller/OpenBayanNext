@@ -1,0 +1,21 @@
+# OpenBayan Classical Arabic Corpus Engine
+
+> High-performance scholarly search engine and crawlable reader for classical Islamic literature (Hadith, Fiqh, Tafsir, Aqeedah).
+
+## Web Routes for Agents
+- Search: `https://openbayan.mustaqbal.or.id/search?q={query}&category={category}&era={era}&tradition={tradition}`
+- Passage Permalinks (HTML): `https://openbayan.mustaqbal.or.id/p/{chunk_id}`
+- Passage Permalinks (Clean Markdown): `https://openbayan.mustaqbal.or.id/p/{chunk_id}.md`
+- Dynamic Sitemap Index: `https://openbayan.mustaqbal.or.id/sitemap.xml`
+- Full Corpus & Operator Specification: `https://openbayan.mustaqbal.or.id/llms-full.txt`
+
+## Available Facet Filters
+- `category`: `الفقه الشافعي`, `الفقه المالكي`, `شروح الحديث`, `كتب السنة`, `التفسير`, `العقيدة`
+- `era`: `early` (<= 300 AH), `classical` (301-700 AH), `late` (>= 701 AH)
+- `tradition`: `athari_salafi`, `classical_jumhur`
+
+## Direct API Endpoints (JSON)
+- Hybrid Search: `GET /api/v1/search?q={query}&mode=hybrid&limit=20`
+- Surrounding Context: `GET /api/v1/chunks/{chunk_id}/surrounding`
+- Chapter Stream: `GET /api/v1/books/{book_id}/sections/{section_id}/chunks`
+- Telemetry & Analytics: `GET /api/v1/telemetry/stats`

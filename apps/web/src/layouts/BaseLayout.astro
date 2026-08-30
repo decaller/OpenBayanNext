@@ -32,18 +32,36 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
 
-    <!-- Instant Early Theme Application to avoid FOUC -->
+    <!-- Instant Early Theme Application to avoid FOUC & Auto Theme Detection -->
     <script is:inline>
       (function() {
         try {
-          const savedTheme = localStorage.getItem('openbayan_theme') || 'emerald';
-          document.documentElement.setAttribute('data-theme', savedTheme);
-        } catch(e) {}
+          const modeStr = localStorage.getItem('openbayan_theme_mode');
+          let savedTheme = 'auto';
+          if (modeStr) {
+            try { savedTheme = JSON.parse(modeStr); } catch(e) { savedTheme = modeStr; }
+          }
+          if (savedTheme && savedTheme !== 'auto') {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.documentElement.setAttribute('data-theme-mode', savedTheme);
+          } else {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', prefersDark ? 'dim' : 'emerald');
+            document.documentElement.setAttribute('data-theme-mode', 'auto');
+          }
+        } catch(e) {
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.setAttribute('data-theme', prefersDark ? 'dim' : 'emerald');
+          document.documentElement.setAttribute('data-theme-mode', 'auto');
+        }
       })();
     </script>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- OpenSearch 1.1 Discovery (Browser Omnibox integration) -->
+    <link rel="search" type="application/opensearchdescription+xml" title="OpenBayan" href="/opensearch.xml" />
 
     <!-- Open Graph / SEO -->
     <meta property="og:type" content="website" />
@@ -118,6 +136,18 @@ const {
             toastEl.classList.remove('hidden');
             setTimeout(() => toastEl.classList.add('hidden'), 3000);
           }
+        }
+      });
+
+      // 3. Global Scholarly Keyboard Navigation Shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+        // Press '/' to focus global search
+        if (e.key === '/') {
+          e.preventDefault();
+          const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+          searchInput?.focus();
         }
       });
     </script>

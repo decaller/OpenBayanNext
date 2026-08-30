@@ -38,8 +38,9 @@ const shamelaUrl = `https://shamela.ws/book/${chunk.book_id}`;
 ---
 
 <article 
-  class="card bg-base-100 border border-base-200 hover:border-primary/40 hover:shadow-md transition-all duration-200 rounded-2xl overflow-visible mb-4 group"
+  class="passage-card card bg-base-100 border border-base-200 hover:border-primary/40 hover:shadow-md transition-all duration-200 rounded-2xl overflow-visible mb-4 group"
   id={`chunk-${chunk.chunk_id}`}
+  data-passage-card
 >
   <div class="card-body p-5 sm:p-6 space-y-3">
     <!-- Top Metadata & Header Bar -->

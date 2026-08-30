@@ -10,6 +10,7 @@ from app.api.search import router as search_router
 from app.api.chunks import router as chunks_router
 from app.api.books import router as books_router
 from app.api.telemetry import router as telemetry_router
+from app.api.sitemaps import router as sitemaps_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,11 +49,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount API Routers
-app.include_router(search_router, prefix="/api/v1")
-app.include_router(chunks_router, prefix="/api/v1")
-app.include_router(books_router, prefix="/api/v1")
-app.include_router(telemetry_router, prefix="/api/v1")
+# Mount API Routers under both /v1 and /api/v1 for reverse proxy flexibility
+for prefix in ("/v1", "/api/v1"):
+    app.include_router(search_router, prefix=prefix)
+    app.include_router(chunks_router, prefix=prefix)
+    app.include_router(books_router, prefix=prefix)
+    app.include_router(telemetry_router, prefix=prefix)
+    app.include_router(sitemaps_router, prefix=prefix)
 
 @app.get("/health", tags=["Diagnostic"])
 async def health_check():

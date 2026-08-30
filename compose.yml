@@ -1,60 +1,124 @@
-services:
-  # 1. Astro Web Frontend
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    container_name: openbayan_web
-    ports:
-      - "4321:4321"
-    environment:
-      - API_URL=http://api:8000
-    depends_on:
-      - api
-    restart: unless-stopped
+version: '3.8'
 
-  # 2. FastAPI Backend & Search Engine
+services:
+  # 1. Automated Database Provisioning with Verification & Atomic Move
+  init-data:
+    image: alpine:latest
+    container_name: openbayan_init_data
+    restart: "no"
+    volumes:
+      - openbayan-data:/data
+    environment:
+      - DB_URL=${DATABASE_CDN_URL:-https://huggingface.co/datasets/YourOrg/openbayan-data/resolve/main/shamela_corpus.db}
+    command: >
+      sh -c "
+        if [ ! -f /data/shamela_corpus.db ]; then
+          echo '⬇️ Initializing database from remote storage...';
+          apk add --no-cache curl sqlite;
+          curl -L -C - -o /data/shamela_corpus.db.tmp \"$$DB_URL\";
+          echo '🔍 Verifying database integrity...';
+          CHECK_RESULT=$$(sqlite3 /data/shamela_corpus.db.tmp 'PRAGMA quick_check;');
+          if [ \"$$CHECK_RESULT\" = 'ok' ]; then
+            mv /data/shamela_corpus.db.tmp /data/shamela_corpus.db;
+            echo '✓ Database provisioned successfully.';
+          else
+            echo \"❌ Corrupt DB download: $$CHECK_RESULT\";
+            rm -f /data/shamela_corpus.db.tmp;
+            exit 1;
+          fi
+        else
+          echo '✓ Database already exists in volume. Skipping download.';
+        fi
+      "
+
+  # 2. Qdrant Vector Engine (1-Bit Binary Quantization & On-Disk FP32 Rescoring)
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    container_name: openbayan_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - openbayan-qdrant:/qdrant/storage
+    environment:
+      - QDRANT__STORAGE__ON_DISK_PAYLOAD=true
+    networks:
+      - openbayan_internal
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/6333 && echo -e \"GET /readyz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | grep -q 200'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # 3. FastAPI Backend Service (Dense Vector & Hybrid FTS5 Retrieval)
   api:
     build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+      context: ./apps/api
+      dockerfile: Dockerfile
     container_name: openbayan_api
-    volumes:
-      - ./data:/data:ro
-    ports:
-      - "8000:8000"
-    environment:
-      - DB_PATH=/data/shamela_corpus.db
     restart: unless-stopped
-
-  # 3. Prefect Orchestration Server (Optional)
-  prefect-server:
-    image: prefecthq/prefect:2-python3.12
-    container_name: openbayan_prefect_server
-    command: prefect server start --host 0.0.0.0
-    ports:
-      - "4200:4200"
-    environment:
-      - PREFECT_SERVER_API_HOST=0.0.0.0
-    volumes:
-      - ./prefect_data:/root/.prefect
-    profiles: ["pipeline"]
-    restart: unless-stopped
-
-  # 4. Dedicated Ingestion Worker (Optional)
-  ingestion-worker:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: openbayan_ingestion_worker
-    command: python -m pipeline.ingest_flow
-    environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
-      - DB_PATH=/data/shamela_corpus.db
-    volumes:
-      - ./data:/data:rw
-      - ./raw_texts:/raw_texts:ro
     depends_on:
-      - prefect-server
-    profiles: ["pipeline"]
+      init-data:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - openbayan-data:/data
+      - openbayan-models:/models
+    environment:
+      - DATABASE_PATH=/data/shamela_corpus.db
+      - DB_PATH=/data/shamela_corpus.db
+      - FASTEMBED_CACHE_PATH=/models
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=shamela_11m
+      - PYTHONUNBUFFERED=1
+      - PORT=8000
+    ports:
+      - "${API_PORT:-8000}:8000"
+    networks:
+      - openbayan_internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+
+  # 4. Astro SSR Frontend Service (0-JS Permalinks, Search Islands & Reader)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: openbayan_web
     restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-4321}:4321"
+    environment:
+      - INTERNAL_API_URL=http://api:8000/v1
+      - PUBLIC_API_URL=/api/v1
+      - HOST=0.0.0.0
+      - PORT=4321
+    networks:
+      - openbayan_internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:4321/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  openbayan-data:
+    driver: local
+  openbayan-models:
+    driver: local
+  openbayan-qdrant:
+    driver: local
+
+networks:
+  openbayan_internal:
+    driver: bridge

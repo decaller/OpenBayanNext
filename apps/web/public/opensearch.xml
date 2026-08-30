@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>OpenBayan</ShortName>
+  <Description>Classical Arabic Hybrid Corpus Search Engine</Description>
+  <Tags>islamic hadith fiqh tafsir arabic corpus</Tags>
+  <Contact>admin@openbayan.org</Contact>
+  <Url type="text/html" template="https://openbayan.mustaqbal.or.id/search?q={searchTerms}"/>
+  <Url type="application/x-suggestions+json" template="https://openbayan.mustaqbal.or.id/api/v1/search?q={searchTerms}&amp;limit=5"/>
+  <Language>ar</Language>
+  <OutputEncoding>UTF-8</OutputEncoding>
+  <InputEncoding>UTF-8</InputEncoding>
+</OpenSearchDescription>

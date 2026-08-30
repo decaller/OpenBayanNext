@@ -20,10 +20,10 @@ def get_db_uri(raw_path: str) -> str:
 class DatabaseManager:
     def __init__(self):
         self._client: libsql_client.Client = None
-        self._db_url: str = os.getenv("DB_PATH", "file:data/shamela_corpus.db")
 
     async def connect(self):
-        resolved_uri = get_db_uri(self._db_url)
+        raw_db_path = os.getenv("DATABASE_PATH") or os.getenv("DB_PATH") or "data/shamela_corpus.db"
+        resolved_uri = get_db_uri(raw_db_path)
         self._client = libsql_client.create_client(url=resolved_uri)
 
     async def close(self):

@@ -15,10 +15,10 @@ const era = Astro.url.searchParams.get('era') || '';
 const tradition = Astro.url.searchParams.get('tradition') || '';
 ---
 
-<header id="site-header" class="sticky top-0 z-30 bg-base-100/90 backdrop-blur border-b border-base-200/80 transition-all">
+<header id="site-header" class="sticky top-0 z-30 bg-base-100/90 backdrop-blur-md border-b border-base-200/80 transition-all">
   <div class="max-w-7xl w-full mx-auto px-4 h-16 flex items-center justify-between relative overflow-hidden">
     
-    <!-- Brand Logo & Title (Centering by default, sliding to start on scroll) -->
+    <!-- Brand Logo & Title (Centering by default on homepage, sliding to start on scroll) -->
     <div id="navbar-brand-wrapper" class="flex items-center gap-3 transition-all duration-300 ease-out navbar-logo-centered z-10">
       <a href={`/?lang=${currentLang}`} class="flex items-center gap-3 group">
         <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary text-primary-content shadow-sm flex items-center justify-center p-1.5 group-hover:scale-105 transition-transform flex-shrink-0">
@@ -35,10 +35,8 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
       </a>
     </div>
 
-
-
-    <!-- Mini Navbar Search Bar (Hidden by default, slides/fades in on the end side on scroll) -->
-    <div id="navbar-search-wrapper" class="navbar-search-hidden flex items-center ms-auto transition-all duration-300 ease-out w-full max-w-xs sm:max-w-sm md:max-w-md ps-4">
+    <!-- Mini Navbar Search Bar (Hidden by default, slides/fades in on scroll) -->
+    <div id="navbar-search-wrapper" class="navbar-search-hidden flex items-center ms-auto transition-all duration-300 ease-out w-full max-w-xs sm:max-w-sm md:max-w-md ps-4 z-20">
       <form action="/search" method="GET" class="w-full relative flex items-center font-sans">
         <input type="hidden" name="lang" value={currentLang} />
         <input type="hidden" name="mode" value={mode} />
@@ -53,7 +51,7 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
             name="q"
             value={query}
             placeholder={t.searchPlaceholder}
-            class="input input-sm w-full bg-base-200/90 focus:bg-base-100 rounded-xl border border-base-300 focus:border-primary text-xs font-sans ps-8 pe-8 text-base-content transition-all shadow-xs"
+            class="input input-sm w-full bg-base-200/90 focus:bg-base-100 rounded-xl border border-base-300 focus:border-primary text-xs font-sans ps-8 pe-8 text-base-content transition-all shadow-2xs"
           />
           <!-- Leading Search Icon -->
           <div class="absolute start-2.5 top-1/2 -translate-y-1/2 text-base-content/50 pointer-events-none">
@@ -74,7 +72,6 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
         </div>
       </form>
     </div>
-
 
   </div>
 </header>
@@ -119,15 +116,15 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
 
     function handleScrollState(isScrolled: boolean) {
       if (isScrolled) {
-        brandWrapper.classList.remove('navbar-logo-centered');
-        brandWrapper.classList.add('navbar-logo-scrolled');
-        searchWrapper.classList.remove('navbar-search-hidden');
-        searchWrapper.classList.add('navbar-search-visible');
+        brandWrapper?.classList.remove('navbar-logo-centered');
+        brandWrapper?.classList.add('navbar-logo-scrolled');
+        searchWrapper?.classList.remove('navbar-search-hidden');
+        searchWrapper?.classList.add('navbar-search-visible');
       } else {
-        brandWrapper.classList.add('navbar-logo-centered');
-        brandWrapper.classList.remove('navbar-logo-scrolled');
-        searchWrapper.classList.add('navbar-search-hidden');
-        searchWrapper.classList.remove('navbar-search-visible');
+        brandWrapper?.classList.add('navbar-logo-centered');
+        brandWrapper?.classList.remove('navbar-logo-scrolled');
+        searchWrapper?.classList.add('navbar-search-hidden');
+        searchWrapper?.classList.remove('navbar-search-visible');
       }
     }
 
@@ -138,22 +135,21 @@ const tradition = Astro.url.searchParams.get('tradition') || '';
         // If main search is NOT intersecting (scrolled out of view), activate navbar search
         handleScrollState(!entry.isIntersecting);
       }, {
-        root: null,
         threshold: 0.1,
-        rootMargin: '-64px 0px 0px 0px' // Header height offset
+        rootMargin: '-64px 0px 0px 0px'
       });
 
       observer.observe(mainSearchContainer);
     } else {
-      // Fallback scroll listener
-      const onScroll = () => {
-        handleScrollState(window.scrollY > 90);
-      };
-      window.addEventListener('scroll', onScroll, { passive: true });
-      onScroll();
+      // On non-homepage pages (e.g. /search, /chunks, /about), always keep logo at start
+      brandWrapper.classList.remove('navbar-logo-centered');
+      brandWrapper.classList.add('navbar-logo-scrolled');
+      searchWrapper.classList.remove('navbar-search-hidden');
+      searchWrapper.classList.add('navbar-search-visible');
     }
   }
 
+  // Run on first load and after Astro View Transitions / hydration
   setupNavbarScrollAnimation();
   document.addEventListener('astro:page-load', setupNavbarScrollAnimation);
 </script>

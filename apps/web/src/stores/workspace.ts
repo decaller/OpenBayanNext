@@ -12,6 +12,7 @@ export interface ActiveSectionState {
 export type FontSizeOption = 'sm' | 'base' | 'lg' | 'xl';
 export type ContextDepth = 1 | 2;
 export type FontFamilyOption = 'amiri' | 'readex' | 'ibm-plex' | 'noto' | 'tajawal' | 'cairo';
+export type ThemeOption = 'auto' | 'emerald' | 'dim' | 'cupcake' | 'night' | 'sunset';
 
 // Load persisted settings from localStorage helper
 function getStored<T>(key: string, defaultValue: T): T {
@@ -40,6 +41,7 @@ export const $isDrawerOpen = atom<boolean>(false);
 export const $activeSection = atom<ActiveSectionState | null>(null);
 export const $fontSize = atom<FontSizeOption>('base');
 export const $currentLang = atom<SupportedLanguage>('ar');
+export const $currentTheme = atom<ThemeOption>(getStored('openbayan_theme_mode', 'auto'));
 export const $toastMessage = atom<string | null>(null);
 
 // Search Results Reading & Display Controls (persisted in localStorage)
@@ -57,6 +59,25 @@ export function showToast(message: string, durationMs: number = 3000) {
       $toastMessage.set(null);
     }
   }, durationMs);
+}
+
+export function setTheme(theme: ThemeOption) {
+  $currentTheme.set(theme);
+  setStored('openbayan_theme_mode', theme);
+  applyTheme(theme);
+}
+
+export function applyTheme(theme: ThemeOption) {
+  if (typeof document === 'undefined') return;
+  if (theme === 'auto') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const actualTheme = prefersDark ? 'dim' : 'emerald';
+    document.documentElement.setAttribute('data-theme', actualTheme);
+    document.documentElement.setAttribute('data-theme-mode', 'auto');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme-mode', theme);
+  }
 }
 
 export function setLanguage(lang: SupportedLanguage) {
@@ -188,4 +209,13 @@ if (typeof window !== 'undefined') {
       $isDrawerOpen.set(false);
     }
   });
+
+  // Listen for OS dark mode changes if in 'auto' mode
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if ($currentTheme.get() === 'auto') {
+        applyTheme('auto');
+      }
+    });
+  } catch (e) {}
 }

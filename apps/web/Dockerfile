@@ -1,33 +1,45 @@
-# Build stage
+# Multi-Stage Lean Node Container for OpenBayan Astro SSR Web
 FROM node:22-alpine AS builder
+
 WORKDIR /app
 
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable corepack and stable pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-# Copy root workspace files
-COPY pnpm-lock.yaml* package.json pnpm-workspace.yaml ./
-COPY apps/web/package.json ./apps/web/
+# Copy app dependencies manifests
+COPY package.json pnpm-lock.yaml* ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm install
 
-# Copy web source
-COPY apps/web ./apps/web
+# Copy application source code
+COPY . .
 
-# Build web
-RUN pnpm --filter @openbayan/web build
+# Build Astro standalone SSR bundle
+RUN pnpm run build
 
-# Production runtime stage
+# Final Production Image
 FROM node:22-alpine AS runner
+
 WORKDIR /app
-ENV HOST=0.0.0.0
-ENV PORT=4321
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=4321
+
+# Copy build artifacts and dependencies from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/public ./public
+
+# Create non-root user
+USER node
+
 EXPOSE 4321
 
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Healthcheck
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget --spider -q http://localhost:4321/ || exit 1
 
-COPY --from=builder /app ./
-
-CMD ["pnpm", "--filter", "@openbayan/web", "preview", "--host", "0.0.0.0", "--port", "4321"]
+CMD ["node", "dist/server/entry.mjs"]

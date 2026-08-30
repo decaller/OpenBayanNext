@@ -1,0 +1,31 @@
+# OpenBayan Robots Policy
+User-agent: *
+Allow: /
+Allow: /search
+Allow: /p/
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /opensearch.xml
+Allow: /sitemap.xml
+Allow: /sitemaps/
+
+# AI Crawlers explicitly welcomed
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://openbayan.mustaqbal.or.id/sitemap.xml

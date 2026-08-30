@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { 
-  INTERNAL_API_URL, 
+  getApiUrl, 
   type ChunkDetailResponse, 
   type SurroundingContextResponse 
 } from '../../lib/api';
@@ -23,10 +23,11 @@ let surrounding: SurroundingContextResponse | null = null;
 let error: string | null = null;
 
 try {
+  const apiUrl = getApiUrl(true);
   // Fetch Level-1 Detail and Level-2 Surrounding Context in parallel
   const [detailRes, surroundingRes] = await Promise.all([
-    fetch(`${INTERNAL_API_URL}/chunks/${chunkId}`),
-    fetch(`${INTERNAL_API_URL}/chunks/${chunkId}/surrounding`),
+    fetch(`${apiUrl}/chunks/${chunkId}`),
+    fetch(`${apiUrl}/chunks/${chunkId}/surrounding`),
   ]);
 
   if (detailRes.ok) {
@@ -42,32 +43,62 @@ try {
   error = err?.message || 'Connection Error';
 }
 
-if (!chunk && !error) {
-  return Astro.redirect('/404');
+if (chunk) {
+  // Set immutable edge caching headers for classical scholarly passages
+  Astro.response.headers.set(
+    'Cache-Control',
+    'public, max-age=604800, s-maxage=31536000, stale-while-revalidate=86400'
+  );
 }
 
 const cleanRawText = chunk ? sanitizeSnippetText(chunk.raw_text) : '';
 const cleanFootnotes = chunk && chunk.footnotes ? sanitizeSnippetText(chunk.footnotes) : '';
 
 // Generate Schema.org JSON-LD metadata for search engine indexing
-const jsonLd = chunk ? {
-  "@context": "https://schema.org",
-  "@type": "ScholarlyArticle",
-  "headline": `${chunk.section_title} - ${chunk.book_name}`,
-  "author": {
-    "@type": "Person",
-    "name": chunk.author_name,
-    "description": `توفي سنة ${chunk.author_death_hijri} هـ`
-  },
-  "isPartOf": {
-    "@type": "Book",
-    "name": chunk.book_name,
+const jsonLd = chunk ? [
+  {
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    "headline": `${chunk.section_title} - ${chunk.book_name}`,
+    "author": {
+      "@type": "Person",
+      "name": chunk.author_name,
+      "description": `توفي سنة ${chunk.author_death_hijri} هـ`
+    },
+    "isPartOf": {
+      "@type": "Book",
+      "name": chunk.book_name,
+      "inLanguage": "ar"
+    },
+    "pageStart": chunk.volume_page,
+    "articleBody": cleanRawText,
     "inLanguage": "ar"
   },
-  "pageStart": chunk.volume_page,
-  "articleBody": cleanRawText,
-  "inLanguage": "ar"
-} : undefined;
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": t.appName,
+        "item": "https://openbayan.mustaqbal.or.id"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": chunk.book_name,
+        "item": `https://openbayan.mustaqbal.or.id/search?q=${encodeURIComponent(chunk.book_name)}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": chunk.section_title,
+        "item": `https://openbayan.mustaqbal.or.id/p/${chunk.chunk_id}`
+      }
+    ]
+  }
+] : undefined;
 
 const pageTitle = chunk 
   ? `${chunk.section_title} | ${chunk.book_name} (${chunk.volume_page})`
