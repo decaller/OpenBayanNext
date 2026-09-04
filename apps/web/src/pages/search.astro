@@ -13,7 +13,10 @@ const currentLang = getLangFromUrl(Astro.url);
 const t = translations[currentLang];
 
 const query = Astro.url.searchParams.get('q') || '';
-const limit = 60; // Fetch all candidate results in a single unified page
+const rawPage = parseInt(Astro.url.searchParams.get('page') || '1', 10);
+const page = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+const rawLimit = parseInt(Astro.url.searchParams.get('limit') || '15', 10);
+const limit = isNaN(rawLimit) || rawLimit < 5 || rawLimit > 60 ? 15 : rawLimit;
 const mode = (Astro.url.searchParams.get('mode') || 'hybrid') as 'hybrid' | 'fts' | 'vector';
 const category = Astro.url.searchParams.get('category') || null;
 const era = Astro.url.searchParams.get('era') || null;
@@ -26,7 +29,7 @@ if (query.trim()) {
   try {
     const params = new URLSearchParams({
       q: query.trim(),
-      page: '1',
+      page: page.toString(),
       limit: limit.toString(),
       mode: mode,
       merge_siblings: 'true'
@@ -270,6 +273,37 @@ const hasActiveFilters = Boolean(category || era || tradition);
             </section>
           );
         })}
+
+        <!-- Pagination Controls -->
+        {searchData && searchData.results.length > 0 && (
+          <div class="flex items-center justify-between gap-4 p-4 bg-base-100 border border-base-200 rounded-2xl shadow-xs font-sans text-xs">
+            {page > 1 ? (
+              <a 
+                href={createFacetUrl(Astro.url, { page: (page - 1).toString() })} 
+                class="btn btn-sm btn-outline btn-primary gap-1.5"
+              >
+                <span>← {currentLang === 'en' ? 'Previous' : currentLang === 'id' ? 'Sebelumnya' : 'السابق'}</span>
+              </a>
+            ) : (
+              <div />
+            )}
+            
+            <span class="text-base-content/70 font-bold">
+              {currentLang === 'en' ? `Page ${page}` : currentLang === 'id' ? `Halaman ${page}` : `الصفحة ${page}`}
+            </span>
+
+            {searchData.results.length >= limit ? (
+              <a 
+                href={createFacetUrl(Astro.url, { page: (page + 1).toString() })} 
+                class="btn btn-sm btn-primary gap-1.5 font-bold"
+              >
+                <span>{currentLang === 'en' ? 'Next Page' : currentLang === 'id' ? 'Selanjutnya' : 'التالي'} →</span>
+              </a>
+            ) : (
+              <div />
+            )}
+          </div>
+        )}
 
         <!-- Actionable Empty State with Recovery Buttons -->
         {searchData && searchData.results.length === 0 && !searchData.pinned_citation && (

@@ -10,7 +10,7 @@ router = APIRouter(prefix="/search", tags=["Search"])
 async def search_endpoint(
     q: str = Query(..., min_length=1, description="Search query string (Arabic or transliterated)"),
     page: int = Query(1, ge=1, description="Page number for pagination"),
-    limit: int = Query(60, ge=1, le=100, description="Number of results per page"),
+    limit: int = Query(20, ge=1, le=100, description="Number of results per page"),
     mode: Literal["hybrid", "fts", "vector"] = Query("hybrid", description="Retrieval mode"),
     category: Optional[str] = Query(None, description="Discipline/Category filter (e.g. 'التفسير', 'شروح الحديث', 'الفقه الشافعي')"),
     era: Optional[Literal["all", "early", "classical", "late"]] = Query(None, description="Chronological era filter"),

@@ -2,16 +2,17 @@ import time
 import re
 from typing import List, Optional, Dict, Any
 import numpy as np
-from app.core.database import get_db_client
+from app.core.database import get_db_client, detect_schema_type
 from app.schemas.search import SearchResponse, SearchResultItem
 from app.core.vectorizer import vectorizer
+from app.core.qdrant_service import qdrant
 from app.services.merger import merge_contiguous_siblings
 from app.services.citation_router import parse_scripture_citation, resolve_pinned_citation
 
 class VectorMatrixCache:
     """
     In-memory Dense Vector Matrix for ultra-low-latency semantic retrieval (<4ms).
-    Holds normalized vectors in a contiguous NumPy array.
+    Holds normalized vectors in a contiguous NumPy array (used for 60-book corpus).
     """
     def __init__(self):
         self.chunk_ids: List[int] = []
@@ -22,9 +23,19 @@ class VectorMatrixCache:
         if self.is_loaded:
             return
         client = await get_db_client()
-        t0 = time.perf_counter()
         
-        # Load pre-computed 768-dim embeddings from SQLite
+        # Check if prepared_chunks has an embedding column
+        try:
+            res_info = await client.execute("PRAGMA table_info(prepared_chunks)")
+            has_emb = any(r[1] == "embedding" for r in res_info.rows)
+            if not has_emb:
+                self.is_loaded = True
+                return
+        except Exception:
+            self.is_loaded = True
+            return
+
+        t0 = time.perf_counter()
         res = await client.execute("SELECT chunk_id, embedding FROM prepared_chunks WHERE embedding IS NOT NULL")
         chunk_ids = []
         vectors = []
@@ -42,15 +53,15 @@ class VectorMatrixCache:
             self.is_loaded = True
             took_ms = (time.perf_counter() - t0) * 1000
             print(f"✓ Cached {len(chunk_ids)} dense vectors into RAM matrix in {took_ms:.2f} ms ({self.matrix.nbytes / (1024*1024):.1f} MB)")
+        else:
+            self.is_loaded = True
 
     def semantic_search(self, query_vec: np.ndarray, top_k: int = 40) -> List[tuple[int, float]]:
         if self.matrix is None or len(self.chunk_ids) == 0:
             return []
-        # Matrix-vector dot product (cosine similarity since normalized)
         sims = np.dot(self.matrix, query_vec)
         top_indices = np.argpartition(sims, -top_k)[-top_k:]
         top_indices = top_indices[np.argsort(-sims[top_indices])]
-        
         return [(self.chunk_ids[idx], float(sims[idx])) for idx in top_indices]
 
 vector_matrix_cache = VectorMatrixCache()
@@ -66,14 +77,11 @@ async def search_hybrid(
     tradition: Optional[str] = None,
     merge_siblings: bool = True
 ) -> SearchResponse:
-    """
-    Executes high-performance hybrid retrieval combining CTE-driven SQLite FTS5 BM25,
-    dense vector re-ranking, faceted metadata predicates, and citation routing interceptor.
-    """
     t_start = time.perf_counter()
     client = await get_db_client()
+    schema = await detect_schema_type(client)
 
-    # Pre-warm vector cache
+    # Pre-warm vector cache if legacy corpus
     await vector_matrix_cache.load_if_needed()
 
     # 1. Check Scripture Citation Interceptor (Ayah / Hadith lookup)
@@ -89,12 +97,21 @@ async def search_hybrid(
     expanded_fts_expr = None
     if query_tokens:
         fts_terms = []
+        is_multi_word = len(query_tokens) > 1
         for t in query_tokens:
             bare_t = re.sub(r"^(ال|بال|كال|فال|لل|وال)", "", t)
-            if len(bare_t) >= 3:
-                fts_terms.append(f'("{t}"* OR "{bare_t}"*)')
+            if is_multi_word:
+                # Multi-word queries: exact token match or bare-token variant without wildcard scanning
+                if len(bare_t) >= 3 and bare_t != t:
+                    fts_terms.append(f'("{t}" OR "{bare_t}")')
+                else:
+                    fts_terms.append(f'"{t}"')
             else:
-                fts_terms.append(f'"{t}"*')
+                # Single-word queries: prefix wildcard expansion
+                if len(bare_t) >= 3 and bare_t != t:
+                    fts_terms.append(f'("{t}"* OR "{bare_t}"*)')
+                else:
+                    fts_terms.append(f'"{t}"*')
         expanded_fts_expr = " AND ".join(fts_terms)
 
     # 3. Resolve Era Hijri bounds
@@ -108,7 +125,6 @@ async def search_hybrid(
     elif era == "late":
         min_hijri = 701
 
-    # Normalize category / tradition
     filter_category = category if category and category != "all" else None
     filter_tradition = tradition if tradition and tradition != "all" else None
 
@@ -121,137 +137,262 @@ async def search_hybrid(
             print(f"⚠️ Vectorizer error: {e}, falling back to pure BM25")
             mode = "fts"
 
-    # 5. Execute CTE-driven FTS5 Search with Pushed-Down Relational Facet Filters
     fts_candidates: Dict[int, Dict[str, Any]] = {}
     fts_ranks: Dict[int, int] = {}
-    fetch_buffer_k = max(min(limit * 3, 100), 40)
+    fetch_buffer_k = max(min(limit * 2, 60), 20)
 
+    # 5. Execute FTS5 Search
     if expanded_fts_expr and mode in ("hybrid", "fts"):
-        book_filter = ""
-        params: List[Any] = [expanded_fts_expr]
-        if book_ids:
-            placeholders = ",".join("?" for _ in book_ids)
-            book_filter = f"AND p.book_id IN ({placeholders})"
-            params.extend(book_ids)
-            
-        sql_fts = f"""
-        WITH fts_matches AS (
-            SELECT rowid AS chunk_id, rank AS bm25_rank
-            FROM prepared_chunks_fts
-            WHERE prepared_chunks_fts MATCH ?
-            LIMIT 150
-        )
-        SELECT 
-            p.chunk_id, p.book_id, b.title_ar, p.volume_page, p.chunk_order,
-            p.section_id, p.section_title, p.breadcrumb, p.raw_text, p.footnotes,
-            p.is_section_start, b.category_name, b.author_name, b.author_death_hijri,
-            b.tradition, b.era_tag, p.embedding, m.bm25_rank
-        FROM fts_matches m
-        JOIN prepared_chunks p ON m.chunk_id = p.chunk_id
-        JOIN books b ON p.book_id = b.book_id
-        WHERE (? IS NULL OR b.category_name = ?)
-          AND (? IS NULL OR b.author_death_hijri >= ?)
-          AND (? IS NULL OR b.author_death_hijri <= ?)
-          AND (? IS NULL OR b.tradition = ?)
-          {book_filter}
-        ORDER BY m.bm25_rank
-        LIMIT {fetch_buffer_k};
-        """
-        params.extend([
-            filter_category, filter_category,
-            min_hijri, min_hijri,
-            max_hijri, max_hijri,
-            filter_tradition, filter_tradition
-        ])
+        if schema == "full":
+            sql_fts = f"""
+            WITH fts_matches AS (
+                SELECT rowid AS chunk_rowid, rank AS bm25_rank
+                FROM prepared_chunks_fts
+                WHERE prepared_chunks_fts MATCH ?
+                LIMIT 150
+            )
+            SELECT 
+                p.rowid, p.id, p.title, p.author, p.death_year, p.volume_page, p.chunk_no, p.raw_text, m.bm25_rank
+            FROM fts_matches m
+            JOIN prepared_chunks p ON m.chunk_rowid = p.rowid
+            WHERE (? IS NULL OR p.death_year >= ?)
+              AND (? IS NULL OR p.death_year <= ?)
+            ORDER BY m.bm25_rank
+            LIMIT {fetch_buffer_k};
+            """
+            try:
+                res_fts = await client.execute(sql_fts, [
+                    expanded_fts_expr,
+                    min_hijri, min_hijri,
+                    max_hijri, max_hijri
+                ])
+                for rank_idx, row in enumerate(res_fts.rows, 1):
+                    chunk_id = row[0]
+                    uuid_id = row[1]
+                    title = row[2] or "كتاب غير معنون"
+                    author = row[3] or "غير معروف"
+                    d_year = row[4]
+                    vol_page = row[5] or ""
+                    chunk_no = row[6] or 0
+                    raw_text = row[7] or ""
+                    bm25_rank = row[8]
 
-        try:
-            res_fts = await client.execute(sql_fts, params)
-            for rank_idx, row in enumerate(res_fts.rows, 1):
-                chunk_id = row[0]
-                fts_ranks[chunk_id] = rank_idx
-                fts_candidates[chunk_id] = {
-                    "chunk_id": chunk_id,
-                    "book_id": row[1],
-                    "book_name": row[2],
-                    "volume_page": row[3],
-                    "chunk_order": row[4],
-                    "section_id": row[5],
-                    "section_title": row[6],
-                    "breadcrumb": row[7],
-                    "raw_text": row[8],
-                    "footnotes": row[9],
-                    "is_section_start": bool(row[10]),
-                    "category_name": row[11],
-                    "author_name": row[12],
-                    "author_death_hijri": row[13],
-                    "author_tradition": row[14],
-                    "era_tag": row[15],
-                    "embedding": row[16],
-                    "bm25_rank": row[17],
-                    "bm25_score": -float(row[17]) if row[17] is not None else 0.0,
-                    "vector_score": 0.0
-                }
-        except Exception as e:
-            print(f"⚠️ FTS query execution failed: {e}")
+                    fts_ranks[chunk_id] = rank_idx
+                    fts_candidates[chunk_id] = {
+                        "chunk_id": chunk_id,
+                        "uuid": uuid_id,
+                        "book_id": abs(hash(title)) % 1000000,
+                        "book_name": title,
+                        "volume_page": vol_page,
+                        "chunk_order": chunk_no,
+                        "section_id": str(chunk_id),
+                        "section_title": title,
+                        "breadcrumb": f"{title} > {vol_page}",
+                        "raw_text": raw_text,
+                        "footnotes": None,
+                        "is_section_start": False,
+                        "category_name": "تراث إسلامي",
+                        "author_name": author,
+                        "author_death_hijri": d_year,
+                        "author_tradition": None,
+                        "era_tag": None,
+                        "embedding": None,
+                        "bm25_rank": bm25_rank,
+                        "bm25_score": -float(bm25_rank) if bm25_rank is not None else 0.0,
+                        "vector_score": 0.0
+                    }
+            except Exception as e:
+                print(f"⚠️ FTS query execution failed on full library: {e}")
+        else:
+            book_filter = ""
+            params: List[Any] = [expanded_fts_expr]
+            if book_ids:
+                placeholders = ",".join("?" for _ in book_ids)
+                book_filter = f"AND p.book_id IN ({placeholders})"
+                params.extend(book_ids)
+                
+            sql_fts = f"""
+            WITH fts_matches AS (
+                SELECT rowid AS chunk_id, rank AS bm25_rank
+                FROM prepared_chunks_fts
+                WHERE prepared_chunks_fts MATCH ?
+                LIMIT 150
+            )
+            SELECT 
+                p.chunk_id, p.book_id, b.title_ar, p.volume_page, p.chunk_order,
+                p.section_id, p.section_title, p.breadcrumb, p.raw_text, p.footnotes,
+                p.is_section_start, b.category_name, b.author_name, b.author_death_hijri,
+                b.tradition, b.era_tag, p.embedding, m.bm25_rank
+            FROM fts_matches m
+            JOIN prepared_chunks p ON m.chunk_id = p.chunk_id
+            JOIN books b ON p.book_id = b.book_id
+            WHERE (? IS NULL OR b.category_name = ?)
+              AND (? IS NULL OR b.author_death_hijri >= ?)
+              AND (? IS NULL OR b.author_death_hijri <= ?)
+              AND (? IS NULL OR b.tradition = ?)
+              {book_filter}
+            ORDER BY m.bm25_rank
+            LIMIT {fetch_buffer_k};
+            """
+            params.extend([
+                filter_category, filter_category,
+                min_hijri, min_hijri,
+                max_hijri, max_hijri,
+                filter_tradition, filter_tradition
+            ])
 
-    # 6. Dual-Path Vector Re-ranking / Semantic Fallback
+            try:
+                res_fts = await client.execute(sql_fts, params)
+                for rank_idx, row in enumerate(res_fts.rows, 1):
+                    chunk_id = row[0]
+                    fts_ranks[chunk_id] = rank_idx
+                    fts_candidates[chunk_id] = {
+                        "chunk_id": chunk_id,
+                        "book_id": row[1],
+                        "book_name": row[2],
+                        "volume_page": row[3],
+                        "chunk_order": row[4],
+                        "section_id": row[5],
+                        "section_title": row[6],
+                        "breadcrumb": row[7],
+                        "raw_text": row[8],
+                        "footnotes": row[9],
+                        "is_section_start": bool(row[10]),
+                        "category_name": row[11],
+                        "author_name": row[12],
+                        "author_death_hijri": row[13],
+                        "author_tradition": row[14],
+                        "era_tag": row[15],
+                        "embedding": row[16],
+                        "bm25_rank": row[17],
+                        "bm25_score": -float(row[17]) if row[17] is not None else 0.0,
+                        "vector_score": 0.0
+                    }
+            except Exception as e:
+                print(f"⚠️ FTS query execution failed: {e}")
+
+    # 6. Dual-Path Vector Retrieval (Qdrant for Full Library / In-Memory for Corpus)
     vec_ranks: Dict[int, int] = {}
     
     if mode in ("hybrid", "vector") and query_vec is not None:
-        if len(fts_candidates) >= 10:
-            scored_candidates = []
-            for c_id, item in fts_candidates.items():
-                emb_blob = item["embedding"]
-                if emb_blob and len(emb_blob) == 3072:
-                    vec = np.frombuffer(emb_blob, dtype="<f4")
-                    sim = float(np.dot(vec, query_vec))
-                    item["vector_score"] = sim
-                    scored_candidates.append((c_id, sim))
-                else:
-                    item["vector_score"] = 0.0
-                    scored_candidates.append((c_id, 0.0))
+        if schema == "full":
+            if qdrant.client is not None:
+                try:
+                    q_hits = await qdrant.search(query_vec.tolist(), limit=fetch_buffer_k)
+                    if q_hits:
+                        uuid_to_sim = {u: s for u, s in q_hits}
+                        for item in fts_candidates.values():
+                            u = item.get("uuid")
+                            if u in uuid_to_sim:
+                                item["vector_score"] = uuid_to_sim[u]
 
-            # Rank by vector cosine similarity
-            scored_candidates.sort(key=lambda x: x[1], reverse=True)
-            for r_idx, (c_id, _) in enumerate(scored_candidates, 1):
-                vec_ranks[c_id] = r_idx
+                        missing_uuids = [u for u in uuid_to_sim if not any(item.get("uuid") == u for item in fts_candidates.values())]
+                        if missing_uuids:
+                            placeholders = ",".join("?" for _ in missing_uuids)
+                            hyd_sql = f"""
+                            SELECT rowid, id, title, author, death_year, volume_page, chunk_no, raw_text
+                            FROM prepared_chunks
+                            WHERE id IN ({placeholders})
+                            """
+                            hyd_res = await client.execute(hyd_sql, missing_uuids)
+                            for hrow in hyd_res.rows:
+                                cid = hrow[0]
+                                uid = hrow[1]
+                                title = hrow[2] or "كتاب غير معنون"
+                                author = hrow[3] or "غير معروف"
+                                d_year = hrow[4]
+                                vol_page = hrow[5] or ""
+                                chunk_no = hrow[6] or 0
+                                raw_text = hrow[7] or ""
+                                sim = uuid_to_sim.get(uid, 0.0)
 
-        # Semantic fallback to in-memory matrix
-        elif vector_matrix_cache.matrix is not None and len(vector_matrix_cache.chunk_ids) > 0:
-            semantic_hits = vector_matrix_cache.semantic_search(query_vec, top_k=fetch_buffer_k)
-            for r_idx, (c_id, sim) in enumerate(semantic_hits, 1):
-                vec_ranks[c_id] = r_idx
-                if c_id not in fts_candidates:
-                    row_res = await client.execute("""
-                        SELECT p.chunk_id, p.book_id, b.title_ar, p.volume_page, p.chunk_order,
-                               p.section_id, p.section_title, p.breadcrumb, p.raw_text, p.footnotes,
-                               p.is_section_start, b.category_name, b.author_name, b.author_death_hijri,
-                               b.tradition, b.era_tag
-                        FROM prepared_chunks p
-                        JOIN books b ON p.book_id = b.book_id
-                        WHERE p.chunk_id = ?
-                          AND (? IS NULL OR b.category_name = ?)
-                          AND (? IS NULL OR b.author_death_hijri >= ?)
-                          AND (? IS NULL OR b.author_death_hijri <= ?)
-                          AND (? IS NULL OR b.tradition = ?)
-                    """, [
-                        c_id,
-                        filter_category, filter_category,
-                        min_hijri, min_hijri,
-                        max_hijri, max_hijri,
-                        filter_tradition, filter_tradition
-                    ])
-                    if row_res.rows:
-                        r = row_res.rows[0]
-                        fts_candidates[c_id] = {
-                            "chunk_id": r[0], "book_id": r[1], "book_name": r[2],
-                            "volume_page": r[3], "chunk_order": r[4], "section_id": r[5],
-                            "section_title": r[6], "breadcrumb": r[7], "raw_text": r[8],
-                            "footnotes": r[9], "is_section_start": bool(r[10]),
-                            "category_name": r[11], "author_name": r[12],
-                            "author_death_hijri": r[13], "author_tradition": r[14],
-                            "era_tag": r[15], "bm25_score": None, "vector_score": sim
-                        }
+                                fts_candidates[cid] = {
+                                    "chunk_id": cid,
+                                    "uuid": uid,
+                                    "book_id": abs(hash(title)) % 1000000,
+                                    "book_name": title,
+                                    "volume_page": vol_page,
+                                    "chunk_order": chunk_no,
+                                    "section_id": str(cid),
+                                    "section_title": title,
+                                    "breadcrumb": f"{title} > {vol_page}",
+                                    "raw_text": raw_text,
+                                    "footnotes": None,
+                                    "is_section_start": False,
+                                    "category_name": "تراث إسلامي",
+                                    "author_name": author,
+                                    "author_death_hijri": d_year,
+                                    "author_tradition": None,
+                                    "era_tag": None,
+                                    "embedding": None,
+                                    "bm25_rank": None,
+                                    "bm25_score": None,
+                                    "vector_score": sim
+                                }
+
+                        scored_candidates = sorted(
+                            fts_candidates.items(),
+                            key=lambda x: x[1].get("vector_score") or 0.0,
+                            reverse=True
+                        )
+                        for r_idx, (cid, item) in enumerate(scored_candidates, 1):
+                            if item.get("vector_score") and item["vector_score"] > 0:
+                                vec_ranks[cid] = r_idx
+                except Exception as e:
+                    print(f"⚠️ Qdrant search fallback: {e}")
+        else:
+            if len(fts_candidates) >= 10:
+                scored_candidates = []
+                for c_id, item in fts_candidates.items():
+                    emb_blob = item.get("embedding")
+                    if emb_blob and len(emb_blob) == 3072:
+                        vec = np.frombuffer(emb_blob, dtype="<f4")
+                        sim = float(np.dot(vec, query_vec))
+                        item["vector_score"] = sim
+                        scored_candidates.append((c_id, sim))
+                    else:
+                        item["vector_score"] = 0.0
+                        scored_candidates.append((c_id, 0.0))
+
+                scored_candidates.sort(key=lambda x: x[1], reverse=True)
+                for r_idx, (c_id, _) in enumerate(scored_candidates, 1):
+                    vec_ranks[c_id] = r_idx
+
+            elif vector_matrix_cache.matrix is not None and len(vector_matrix_cache.chunk_ids) > 0:
+                semantic_hits = vector_matrix_cache.semantic_search(query_vec, top_k=fetch_buffer_k)
+                for r_idx, (c_id, sim) in enumerate(semantic_hits, 1):
+                    vec_ranks[c_id] = r_idx
+                    if c_id not in fts_candidates:
+                        row_res = await client.execute("""
+                            SELECT p.chunk_id, p.book_id, b.title_ar, p.volume_page, p.chunk_order,
+                                   p.section_id, p.section_title, p.breadcrumb, p.raw_text, p.footnotes,
+                                   p.is_section_start, b.category_name, b.author_name, b.author_death_hijri,
+                                   b.tradition, b.era_tag
+                            FROM prepared_chunks p
+                            JOIN books b ON p.book_id = b.book_id
+                            WHERE p.chunk_id = ?
+                              AND (? IS NULL OR b.category_name = ?)
+                              AND (? IS NULL OR b.author_death_hijri >= ?)
+                              AND (? IS NULL OR b.author_death_hijri <= ?)
+                              AND (? IS NULL OR b.tradition = ?)
+                        """, [
+                            c_id,
+                            filter_category, filter_category,
+                            min_hijri, min_hijri,
+                            max_hijri, max_hijri,
+                            filter_tradition, filter_tradition
+                        ])
+                        if row_res.rows:
+                            r = row_res.rows[0]
+                            fts_candidates[c_id] = {
+                                "chunk_id": r[0], "book_id": r[1], "book_name": r[2],
+                                "volume_page": r[3], "chunk_order": r[4], "section_id": r[5],
+                                "section_title": r[6], "breadcrumb": r[7], "raw_text": r[8],
+                                "footnotes": r[9], "is_section_start": bool(r[10]),
+                                "category_name": r[11], "author_name": r[12],
+                                "author_death_hijri": r[13], "author_tradition": r[14],
+                                "era_tag": r[15], "bm25_score": None, "vector_score": sim
+                            }
 
     # 7. Compute Reciprocal Rank Fusion (RRF) Scores (k=60)
     all_candidate_ids = set(fts_candidates.keys())
@@ -303,7 +444,6 @@ async def search_hybrid(
         )
         scored_items.append(search_item)
 
-    # Sort candidates by RRF score descending
     scored_items.sort(key=lambda x: x.rrf_score, reverse=True)
 
     # 8. Apply Contiguous Sibling Merger
@@ -312,29 +452,63 @@ async def search_hybrid(
     else:
         final_items = scored_items
 
-    # 9. Apply Result Limiting
+    # 9. Apply Result Limiting with Page Offset
     total_hits = len(final_items)
-    paginated_results = final_items[:limit]
+    start_idx = max((page - 1) * limit, 0)
+    paginated_results = final_items[start_idx : start_idx + limit]
 
     # 10. Enrich Results with Surrounding Preceding/Succeeding Chunks (N-1, N+1)
-    for p_item in paginated_results:
-        try:
-            n_res = await client.execute("""
-                SELECT chunk_id, chunk_order, raw_text
-                FROM prepared_chunks
-                WHERE book_id = ? AND chunk_order IN (?, ?)
-            """, [p_item.book_id, p_item.chunk_order - 1, p_item.chunk_order + 1])
-            
-            for nrow in n_res.rows:
-                c_id, c_order, c_text = nrow[0], nrow[1], nrow[2]
-                if c_order == p_item.chunk_order - 1:
-                    p_item.preceding_chunk_id = c_id
-                    p_item.preceding_text = c_text
-                elif c_order == p_item.chunk_order + 1:
-                    p_item.succeeding_chunk_id = c_id
-                    p_item.succeeding_text = c_text
-        except Exception as e:
-            print(f"⚠️ Context enrichment failed for chunk {p_item.chunk_id}: {e}")
+    if schema == "full":
+        neighbor_ids = set()
+        for p_item in paginated_results:
+            if isinstance(p_item.chunk_id, int):
+                if p_item.chunk_order > 0 and p_item.chunk_id > 1:
+                    neighbor_ids.add(p_item.chunk_id - 1)
+                neighbor_ids.add(p_item.chunk_id + 1)
+
+        if neighbor_ids:
+            try:
+                id_list = list(neighbor_ids)
+                placeholders = ",".join("?" for _ in id_list)
+                n_res = await client.execute(f"""
+                    SELECT rowid, chunk_no, raw_text, title
+                    FROM prepared_chunks
+                    WHERE rowid IN ({placeholders})
+                """, id_list)
+                neighbor_map = {row[0]: (row[1], row[2], row[3]) for row in n_res.rows}
+                for p_item in paginated_results:
+                    prev_id = p_item.chunk_id - 1
+                    if prev_id in neighbor_map:
+                        c_order, c_text, b_title = neighbor_map[prev_id]
+                        if b_title == p_item.book_name and c_order == p_item.chunk_order - 1:
+                            p_item.preceding_chunk_id = prev_id
+                            p_item.preceding_text = c_text
+                    next_id = p_item.chunk_id + 1
+                    if next_id in neighbor_map:
+                        c_order, c_text, b_title = neighbor_map[next_id]
+                        if b_title == p_item.book_name and c_order == p_item.chunk_order + 1:
+                            p_item.succeeding_chunk_id = next_id
+                            p_item.succeeding_text = c_text
+            except Exception as e:
+                print(f"⚠️ Context enrichment failed: {e}")
+    else:
+        for p_item in paginated_results:
+            try:
+                n_res = await client.execute("""
+                    SELECT chunk_id, chunk_order, raw_text
+                    FROM prepared_chunks
+                    WHERE book_id = ? AND chunk_order IN (?, ?)
+                """, [p_item.book_id, p_item.chunk_order - 1, p_item.chunk_order + 1])
+                for nrow in n_res.rows:
+                    c_id, c_order, c_text = nrow[0], nrow[1], nrow[2]
+                    if c_order == p_item.chunk_order - 1:
+                        p_item.preceding_chunk_id = c_id
+                        p_item.preceding_text = c_text
+                    elif c_order == p_item.chunk_order + 1:
+                        p_item.succeeding_chunk_id = c_id
+                        p_item.succeeding_text = c_text
+            except Exception as e:
+                print(f"⚠️ Context enrichment failed for chunk {p_item.chunk_id}: {e}")
 
     t_end = time.perf_counter()
     took_ms = (t_end - t_start) * 1000
